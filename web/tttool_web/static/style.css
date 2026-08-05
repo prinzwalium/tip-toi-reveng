@@ -226,5 +226,33 @@ table.list tr:hover td { background: var(--bg); }
 #preview-body img { max-width: 86vw; max-height: 74vh; image-rendering: pixelated; background: #fff; }
 #preview-body embed { width: 86vw; height: 74vh; }
 
+/* ---- tooltips ---- */
+
+#tooltip {
+  position: fixed;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  max-width: 320px;
+  padding: 6px 9px;
+  border-radius: 6px;
+  background: var(--ink);
+  color: var(--panel);
+  font-size: 12.5px;
+  line-height: 1.4;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .28);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .12s ease;
+}
+#tooltip.visible { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  #tooltip { transition: none; }
+}
+
+/* Only the non-interactive carriers get the help cursor; buttons, links and
+   inputs keep the cursor that says what they do. */
+span[data-tip], code[data-tip], .kind[data-tip], label[data-tip] > .label { cursor: help; }
+
 dl.cmdlist dt { margin-top: 10px; }
 dl.cmdlist dd { margin: 2px 0 0 18px; color: var(--muted); }

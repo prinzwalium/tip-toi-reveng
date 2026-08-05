@@ -13,7 +13,9 @@ meant to be run as a container on your own server. It gives you
  * **previews** — play extracted `.ogg` samples, look at generated OID codes and
    PDFs without leaving the page,
  * **audio conversion** — turn any uploaded audio file into the mono 22050 Hz
-   Ogg Vorbis the pen expects, using ffmpeg.
+   Ogg Vorbis the pen expects, using ffmpeg,
+ * **tooltips** — point at (or tab to) any command, field or file action for a
+   one-line explanation of what it does; the *Commands* page has the long version.
 
 `tttool play` is not available in the browser: it is an interactive terminal
 simulation. Run it inside the container if you need it (see below).

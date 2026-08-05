@@ -1,34 +1,48 @@
+{% set kind_tips = {
+  'dir':    'A directory. Commands that write many files put them in one of these.',
+  'text':   'A text file — YAML sources, exported scripts, transcripts. Editable in the browser.',
+  'audio':  'An audio sample. The pen only plays mono Ogg Vorbis at 22050 Hz.',
+  'image':  'An image, usually a generated OID code.',
+  'gme':    'A compiled GME file — this is what you copy onto the pen.',
+  'pdf':    'A PDF, usually a sheet of OID codes to print.',
+  'binary': 'Some other file. It can be used as input and downloaded, but not edited here.',
+} %}
 <table class="list files">
   <thead><tr><th>File</th><th>Size</th><th>Changed</th><th></th></tr></thead>
   <tbody>
   {% for f in files %}
     <tr class="{{ 'is-dir' if f.is_dir }}" data-path="{{ f.relpath }}">
       <td>
-        <span class="kind kind-{{ f.kind }}" title="{{ f.kind }}"></span>
+        <span class="kind kind-{{ f.kind }}" data-tip="{{ kind_tips.get(f.kind, f.kind) }}"></span>
         {% if f.is_dir %}
           <span class="strong">{{ f.relpath }}/</span>
         {% else %}
-          <a href="{{ url_for('download', name=project.name, path=f.relpath) }}">{{ f.relpath }}</a>
+          <a href="{{ url_for('download', name=project.name, path=f.relpath) }}"
+             data-tip="Download {{ f.name }} to your computer.">{{ f.relpath }}</a>
         {% endif %}
       </td>
       <td class="muted nowrap">{{ '' if f.is_dir else f.size_str }}</td>
       <td class="muted nowrap">{{ f.mtime_str }}</td>
       <td class="right nowrap actions">
         {% if f.editable %}
-          <a class="button ghost" href="{{ url_for('edit', name=project.name, path=f.relpath) }}">Edit</a>
+          <a class="button ghost" href="{{ url_for('edit', name=project.name, path=f.relpath) }}"
+             data-tip="Open this file in the browser editor.">Edit</a>
         {% endif %}
         {% if f.kind in ('image', 'audio', 'pdf') %}
           <button class="ghost" type="button" data-preview="{{ url_for('raw', name=project.name, path=f.relpath) }}"
-                  data-kind="{{ f.kind }}" data-name="{{ f.relpath }}">Preview</button>
+                  data-kind="{{ f.kind }}" data-name="{{ f.relpath }}"
+                  data-tip="{% if f.kind == 'audio' %}Listen to this sample without downloading it.{% else %}Look at this file without downloading it.{% endif %}">Preview</button>
         {% endif %}
         {% if f.kind == 'audio' %}
-          <button class="ghost" type="button" data-convert="{{ f.relpath }}">→ Ogg</button>
+          <button class="ghost" type="button" data-convert="{{ f.relpath }}"
+                  data-tip="Convert to mono Ogg Vorbis at 22050 Hz with ffmpeg — the only format the pen plays. Writes a new .ogg next to this file.">→ Ogg</button>
         {% endif %}
         {% if allow_delete %}
         <form method="post" action="{{ url_for('delete_file', name=project.name) }}" class="inline"
               data-confirm="Delete {{ f.relpath }}?">
           <input type="hidden" name="path" value="{{ f.relpath }}">
-          <button class="danger ghost" type="submit">×</button>
+          <button class="danger ghost" type="submit" aria-label="Delete {{ f.relpath }}"
+                  data-tip="Delete {{ f.name }}{{ '/ and everything in it' if f.is_dir }}. There is no undo.">×</button>
         </form>
         {% endif %}
       </td>
