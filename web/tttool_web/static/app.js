@@ -17,6 +17,77 @@ function wireConfirm() {
 }
 wireConfirm();
 
+// ------------------------------------------------------------------ tooltips
+
+// One floating bubble for every [data-tip] element on the page. Positioned
+// fixed rather than drawn with ::after, so that tooltips inside the scrolling
+// file list are not clipped, and hooked up by delegation, so that elements
+// added later (the file list is re-rendered after every run) just work.
+(function () {
+  var DELAY = 180;
+  var bubble = document.createElement("div");
+  bubble.id = "tooltip";
+  bubble.setAttribute("role", "tooltip");
+  document.body.appendChild(bubble);
+
+  var anchor = null;
+  var timer = null;
+
+  function place() {
+    var target = anchor.getBoundingClientRect();
+    var own = bubble.getBoundingClientRect();
+    var margin = 8;
+    var left = target.left + target.width / 2 - own.width / 2;
+    left = Math.max(margin, Math.min(left, window.innerWidth - own.width - margin));
+    var top = target.top - own.height - margin;
+    if (top < margin) top = target.bottom + margin; // no room above, flip below
+    bubble.style.left = Math.round(left) + "px";
+    bubble.style.top = Math.round(top) + "px";
+  }
+
+  function show(element) {
+    var text = element.getAttribute("data-tip");
+    if (!text) return;
+    anchor = element;
+    bubble.textContent = text;
+    // Render off screen first so that the size can be measured.
+    bubble.style.left = "-9999px";
+    bubble.style.top = "0";
+    bubble.classList.add("visible");
+    place();
+    element.setAttribute("aria-describedby", "tooltip");
+  }
+
+  function hide() {
+    window.clearTimeout(timer);
+    if (anchor) anchor.removeAttribute("aria-describedby");
+    anchor = null;
+    bubble.classList.remove("visible");
+  }
+
+  function schedule(element, delay) {
+    if (element === anchor) return;
+    hide();
+    if (!element) return;
+    if (!delay) return show(element);
+    timer = window.setTimeout(function () { show(element); }, delay);
+  }
+
+  document.addEventListener("mouseover", function (event) {
+    schedule(event.target.closest("[data-tip]"), DELAY);
+  });
+  // Keyboard users get it without the delay, as soon as the element is focused.
+  document.addEventListener("focusin", function (event) {
+    schedule(event.target.closest("[data-tip]"), 0);
+  });
+  document.addEventListener("focusout", hide);
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") hide();
+  });
+  window.addEventListener("scroll", hide, true);
+  window.addEventListener("resize", hide);
+})();
+
 // ------------------------------------------------------------- the editor
 
 var editor = $("#editor");
@@ -87,6 +158,11 @@ if (out) {
       var tag = document.createElement("span");
       tag.className = "tag";
       tag.textContent = list.length + " " + kind;
+      tag.setAttribute("data-tip", {
+        created: "Files this run wrote that were not there before. Click one to download it.",
+        changed: "Files that already existed and this run overwrote. Click one to download it.",
+        deleted: "Files that were removed while this command ran.",
+      }[kind]);
       wrap.appendChild(tag);
       var ul = document.createElement("ul");
       list.slice(0, 200).forEach(function (path) {

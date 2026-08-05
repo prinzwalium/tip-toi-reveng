@@ -303,6 +303,18 @@ def test_pages_render(client):
         assert response.status_code == 200, url
 
 
+def test_tooltips_are_rendered(client):
+    make_project(client, start="example")
+    page = client.get("/p/book").data.decode()
+    # The command tabs carry their description …
+    assert 'data-tip="Compile a YAML source file into a GME file for the pen."' in page
+    # … the parameters their own explanation …
+    assert "The number that ties a GME file to a book" in page
+    # … and the file rows explain their actions.
+    assert "Convert to mono Ogg Vorbis" in page
+    assert page.count("data-tip=") > 50
+
+
 def test_preview_serves_audio_inline(client):
     make_project(client, start="example")
     response = client.get("/p/book/raw?path=example/hello.ogg")

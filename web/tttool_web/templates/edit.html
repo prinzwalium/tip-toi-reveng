@@ -15,8 +15,10 @@
     <input type="hidden" name="path" value="{{ relpath }}">
     <textarea name="content" id="editor" spellcheck="false" wrap="off">{{ content }}</textarea>
     <div class="row">
-      <button type="submit">Save &amp; close</button>
-      <button type="submit" name="stay" value="1" class="ghost">Save</button>
+      <button type="submit"
+              data-tip="Write the file and go back to the project.">Save &amp; close</button>
+      <button type="submit" name="stay" value="1" class="ghost"
+              data-tip="Write the file and keep editing (Ctrl+S).">Save</button>
       <span class="hint muted">Tab inserts two spaces — YAML does not like tab characters.</span>
     </div>
   </form>

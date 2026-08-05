@@ -14,8 +14,10 @@
   <h2>New project</h2>
   <form method="post" action="{{ url_for('create_project') }}" class="row">
     <input name="name" placeholder="my-book" required pattern="[A-Za-z0-9][A-Za-z0-9._\-]{0,63}"
-           title="Letters, digits, dot, underscore and dash" autocomplete="off">
-    <label class="field compact">
+           title="Letters, digits, dot, underscore and dash" autocomplete="off"
+           data-tip="Becomes the name of the directory on the server. Letters, digits, dot, underscore and dash.">
+    <label class="field compact"
+           data-tip="What the new project starts out with. You can upload your own files either way.">
       <span class="label">Start from</span>
       <select name="start">
         <option value="template">a minimal book.yaml</option>
@@ -40,11 +42,13 @@
         <td class="muted">{{ p.size }}</td>
         <td class="muted">{{ p.mtime }}</td>
         <td class="right nowrap">
-          <a class="button ghost" href="{{ url_for('archive', name=p.name) }}">Download .zip</a>
+          <a class="button ghost" href="{{ url_for('archive', name=p.name) }}"
+             data-tip="Download every file of this project as one zip — that is the whole backup.">Download .zip</a>
           {% if allow_delete %}
           <form method="post" action="{{ url_for('delete_project', name=p.name) }}" class="inline"
                 data-confirm="Delete project {{ p.name }} and all its files?">
-            <button class="danger ghost" type="submit">Delete</button>
+            <button class="danger ghost" type="submit"
+                    data-tip="Delete the project directory and everything in it. There is no undo.">Delete</button>
           </form>
           {% endif %}
         </td>
