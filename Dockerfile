@@ -35,7 +35,12 @@ WORKDIR /src
 
 # Only the files that actually take part in the Haskell build are copied here,
 # so that editing the web GUI does not invalidate this (expensive) layer.
-COPY cabal.project cabal.project.freeze tttool.cabal Setup.hs LICENSE ./
+#
+# cabal.project.freeze is deliberately left out: it pins the package set of the
+# haskell.nix toolchain (ghc-bignum 1.3, for instance), which the vanilla GHC of
+# this image cannot satisfy. .github/workflows/emulator-tests.yml removes it for
+# the same reason.
+COPY cabal.project tttool.cabal Setup.hs LICENSE ./
 COPY README.md Changelog.md ./
 COPY src ./src
 
