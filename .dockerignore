@@ -19,6 +19,7 @@ book/_build
 testsuite/input
 contrib
 data
+.env
 **/__pycache__
 **/.pytest_cache
 **/*.pyc

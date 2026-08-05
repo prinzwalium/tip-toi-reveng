@@ -99,6 +99,7 @@ RUN set -eux; \
         libtinfo6 \
         python3 \
         python3-venv \
+        tzdata \
         vorbis-tools \
         zlib1g; \
     apt-get install -y --no-install-recommends libttspico-utils \

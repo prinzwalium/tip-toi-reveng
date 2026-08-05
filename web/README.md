@@ -25,10 +25,14 @@ Running it
 ```console
 $ git clone https://github.com/entropia/tip-toi-reveng.git
 $ cd tip-toi-reveng
+$ cp .env.example .env          # optional: port, auth, where the data goes
 $ docker compose up -d --build
 ```
 
 Then open <http://localhost:8080>.
+
+Every setting in `.env` is optional; `docker compose` picks the file up
+automatically and falls back to the defaults documented in `.env.example`.
 
 The first build compiles tttool from source with GHC, which needs roughly
 **4 GB of RAM and 15–30 minutes**. Everything after that is cached; changing
@@ -52,6 +56,26 @@ $ docker run -d --name tttool-web -p 8080:8080 -v tttool-data:/data tttool-web
 ```
 
 
+Running a prebuilt image
+------------------------
+
+`.github/workflows/docker.yml` builds the image on every push to `master` and
+on every tag, smoke tests it, and pushes it to the GitHub container registry as
+`ghcr.io/<owner>/tttool-web`. On the server you then need two files and no
+checkout at all:
+
+```console
+$ curl -O https://raw.githubusercontent.com/entropia/tip-toi-reveng/master/docker-compose.ghcr.yml
+$ curl -o .env https://raw.githubusercontent.com/entropia/tip-toi-reveng/master/.env.example
+$ $EDITOR .env                  # at least TTTOOL_IMAGE, if you forked
+$ docker compose -f docker-compose.ghcr.yml up -d
+```
+
+`docker compose -f docker-compose.ghcr.yml pull && … up -d` updates it later.
+The workflow builds `linux/amd64` only — compiling tttool for arm64 under
+emulation takes hours, so build the image on the ARM machine itself instead.
+
+
 Where your data lives
 ---------------------
 
@@ -59,24 +83,25 @@ Everything is in `/data`, one directory per project — nothing else is stored,
 there is no database. Back it up by copying that directory (or by using
 “Download .zip” in the GUI).
 
-The container runs as uid 1000. A named volume (the default in
-`docker-compose.yml`) just works; if you prefer a bind mount, make the
-directory writable for that uid first:
-
-```yaml
-    volumes:
-      - ./data:/data
-```
+The container runs as uid 1000. A named volume (the default) just works; for a
+directory on the host, point `TTTOOL_DATA` at it and make it writable for that
+uid first:
 
 ```console
 $ mkdir -p data && sudo chown -R 1000:1000 data
+$ echo 'TTTOOL_DATA=./data' >> .env
+$ docker compose up -d
 ```
 
 
 Configuration
 -------------
 
-All settings are environment variables:
+The compose files read these from `.env` (see `.env.example`): `TTTOOL_PORT`,
+`TTTOOL_BIND_IP`, `TTTOOL_DATA`, `TTTOOL_IMAGE`, `TTTOOL_CONTAINER_NAME`,
+`TTTOOL_SOURCE` and `TZ`. They only shape the container; the application itself
+is configured with the environment variables below, which the compose files
+pass through:
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
@@ -134,6 +159,18 @@ The interactive simulator
 ```console
 $ docker compose exec -it tttool-web tttool play /data/my-book/book.yaml
 ```
+
+
+Continuous integration
+----------------------
+
+`.github/workflows/docker.yml` runs the pytest suite, builds the image, and
+smoke tests it: it starts the container, waits for `/healthz`, checks that a
+speech synthesizer, `oggenc` and `ffmpeg` are present, then creates a project
+from the example book through the HTTP API and has it assemble a GME file and
+an OID code PDF. Only after that does it push to the registry (never for pull
+requests). Layer caching keeps the GHC build out of most runs; a manual run
+(“Run workflow”) can pick `release` instead to skip it entirely.
 
 
 Development

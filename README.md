@@ -80,11 +80,15 @@ Web GUI (Docker)
 If you would rather click than type, there is a small web front end for
 `tttool` that you can run on your own machine or server:
 
+    cp .env.example .env      # optional: port, basic auth, data directory
     docker compose up -d --build
 
 and open <http://localhost:8080>. It offers projects with file upload, an
 in-browser YAML editor, all non-interactive tttool commands as forms, previews
 for generated OID codes and extracted audio, and audio conversion via ffmpeg.
+
+CI publishes a prebuilt image to the GitHub container registry, so a server
+only needs [docker-compose.ghcr.yml](docker-compose.ghcr.yml) and a `.env`.
 See [web/README.md](web/README.md) for configuration, authentication and a
 faster build option.
 

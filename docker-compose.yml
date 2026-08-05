@@ -1,8 +1,14 @@
-# tttool web GUI
+# tttool web GUI — builds the image from this repository.
 #
-#   docker compose up -d --build      # first build takes a while, GHC is slow
+#   cp .env.example .env       # optional, for ports, auth and data location
+#   docker compose up -d --build
 #   open http://localhost:8080
 #
+# The first build compiles tttool with GHC and takes a while; set
+# TTTOOL_SOURCE=release in .env to use the published static binary instead.
+#
+# To run a prebuilt image from the registry instead, use docker-compose.ghcr.yml.
+
 services:
   tttool-web:
     build:
@@ -11,25 +17,26 @@ services:
       args:
         # "build" compiles tttool from this repository (slow, needs ~4 GB RAM).
         # "release" downloads the official static x86_64 binary instead.
-        TTTOOL_SOURCE: build
-    image: tttool-web:latest
-    container_name: tttool-web
+        TTTOOL_SOURCE: ${TTTOOL_SOURCE:-build}
+    image: ${TTTOOL_IMAGE:-tttool-web:latest}
+    container_name: ${TTTOOL_CONTAINER_NAME:-tttool-web}
     restart: unless-stopped
     init: true
     ports:
-      - "8080:8080"
+      # Bind to 127.0.0.1 in .env if a reverse proxy sits in front of this.
+      - "${TTTOOL_BIND_IP:-0.0.0.0}:${TTTOOL_PORT:-8080}:8080"
     volumes:
-      # Projects live here. Use a bind mount such as ./data:/data if you would
-      # rather have the files in a directory on the host; that directory has to
-      # be writable by uid 1000 (chown -R 1000:1000 ./data).
-      - tttool-data:/data
+      # Either the named volume below or a host directory such as ./data,
+      # which then has to be writable by uid 1000 (chown -R 1000:1000 ./data).
+      - ${TTTOOL_DATA:-tttool-data}:/data
     environment:
-      # Uncomment both to protect the GUI with HTTP basic auth. Put it behind a
-      # reverse proxy with TLS if it is reachable from the internet.
-      # TTTOOL_WEB_USER: tiptoi
-      # TTTOOL_WEB_PASSWORD: change-me
-      TTTOOL_WEB_MAX_UPLOAD_MB: "512"
-      TTTOOL_WEB_TIMEOUT: "300"
+      # Set both in .env to protect the GUI with HTTP basic auth.
+      TTTOOL_WEB_USER: ${TTTOOL_WEB_USER:-}
+      TTTOOL_WEB_PASSWORD: ${TTTOOL_WEB_PASSWORD:-}
+      TTTOOL_WEB_MAX_UPLOAD_MB: ${TTTOOL_WEB_MAX_UPLOAD_MB:-512}
+      TTTOOL_WEB_TIMEOUT: ${TTTOOL_WEB_TIMEOUT:-300}
+      TTTOOL_WEB_ALLOW_DELETE: ${TTTOOL_WEB_ALLOW_DELETE:-true}
+      TZ: ${TZ:-UTC}
     security_opt:
       - no-new-privileges:true
 
