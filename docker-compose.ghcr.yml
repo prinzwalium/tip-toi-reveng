@@ -1,0 +1,34 @@
+# tttool web GUI — runs the image published by .github/workflows/docker.yml,
+# without a build and without a checkout of this repository.
+#
+#   curl -O https://raw.githubusercontent.com/prinzwalium/tip-toi-reveng/master/docker-compose.ghcr.yml
+#   curl -O https://raw.githubusercontent.com/prinzwalium/tip-toi-reveng/master/.env.example
+#   mv .env.example .env && edit it
+#   docker compose -f docker-compose.ghcr.yml up -d
+#
+# The registry is public for public repositories; for a private one, log in
+# first: echo $GITHUB_TOKEN | docker login ghcr.io -u <user> --password-stdin
+
+services:
+  tttool-web:
+    image: ${TTTOOL_IMAGE:-ghcr.io/prinzwalium/tttool-web:latest}
+    container_name: ${TTTOOL_CONTAINER_NAME:-tttool-web}
+    restart: unless-stopped
+    init: true
+    pull_policy: always
+    ports:
+      - "${TTTOOL_BIND_IP:-0.0.0.0}:${TTTOOL_PORT:-8080}:8080"
+    volumes:
+      - ${TTTOOL_DATA:-tttool-data}:/data
+    environment:
+      TTTOOL_WEB_USER: ${TTTOOL_WEB_USER:-}
+      TTTOOL_WEB_PASSWORD: ${TTTOOL_WEB_PASSWORD:-}
+      TTTOOL_WEB_MAX_UPLOAD_MB: ${TTTOOL_WEB_MAX_UPLOAD_MB:-512}
+      TTTOOL_WEB_TIMEOUT: ${TTTOOL_WEB_TIMEOUT:-300}
+      TTTOOL_WEB_ALLOW_DELETE: ${TTTOOL_WEB_ALLOW_DELETE:-true}
+      TZ: ${TZ:-UTC}
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  tttool-data:

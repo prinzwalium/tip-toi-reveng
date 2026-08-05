@@ -1,0 +1,40 @@
+<table class="list files">
+  <thead><tr><th>File</th><th>Size</th><th>Changed</th><th></th></tr></thead>
+  <tbody>
+  {% for f in files %}
+    <tr class="{{ 'is-dir' if f.is_dir }}" data-path="{{ f.relpath }}">
+      <td>
+        <span class="kind kind-{{ f.kind }}" title="{{ f.kind }}"></span>
+        {% if f.is_dir %}
+          <span class="strong">{{ f.relpath }}/</span>
+        {% else %}
+          <a href="{{ url_for('download', name=project.name, path=f.relpath) }}">{{ f.relpath }}</a>
+        {% endif %}
+      </td>
+      <td class="muted nowrap">{{ '' if f.is_dir else f.size_str }}</td>
+      <td class="muted nowrap">{{ f.mtime_str }}</td>
+      <td class="right nowrap actions">
+        {% if f.editable %}
+          <a class="button ghost" href="{{ url_for('edit', name=project.name, path=f.relpath) }}">Edit</a>
+        {% endif %}
+        {% if f.kind in ('image', 'audio', 'pdf') %}
+          <button class="ghost" type="button" data-preview="{{ url_for('raw', name=project.name, path=f.relpath) }}"
+                  data-kind="{{ f.kind }}" data-name="{{ f.relpath }}">Preview</button>
+        {% endif %}
+        {% if f.kind == 'audio' %}
+          <button class="ghost" type="button" data-convert="{{ f.relpath }}">→ Ogg</button>
+        {% endif %}
+        {% if allow_delete %}
+        <form method="post" action="{{ url_for('delete_file', name=project.name) }}" class="inline"
+              data-confirm="Delete {{ f.relpath }}?">
+          <input type="hidden" name="path" value="{{ f.relpath }}">
+          <button class="danger ghost" type="submit">×</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="4" class="muted empty">No files yet — upload something below.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>

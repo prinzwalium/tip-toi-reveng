@@ -1,0 +1,174 @@
+name: "Docker image"
+
+# Builds the container image that wraps tttool in a web GUI (see web/README.md),
+# smoke tests it, and publishes it to the GitHub container registry for pushes
+# to master and for tags.
+#
+# The image is built for linux/amd64 only: the default build compiles tttool
+# with GHC, and doing that for arm64 under QEMU emulation takes hours. If you
+# need an arm64 image, run the build on an arm64 machine (or an arm64 runner)
+# with the same Dockerfile.
+
+on:
+  # Pushes to master and tags always publish, so that the published image
+  # matches the branch even when only, say, an example file changed.
+  push:
+    branches: [ master ]
+    tags: [ '*' ]
+  # Pull requests only rebuild when something the image is made of changed.
+  pull_request:
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'docker-compose*.yml'
+      - 'web/**'
+      - 'src/**'
+      - 'tttool.cabal'
+      - 'cabal.project'
+      - 'cabal.project.freeze'
+      - 'example.yaml'
+      - 'example/**'
+      - 'text2speech*.yaml'
+      - '.github/workflows/docker.yml'
+  workflow_dispatch:
+    inputs:
+      tttool_source:
+        description: "How the image gets its tttool binary"
+        type: choice
+        options: [ build, release ]
+        default: build
+      push:
+        description: "Push the image to ghcr.io"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/tttool-web
+
+jobs:
+  web-tests:
+    name: Web GUI tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: web/requirements-dev.txt
+
+      - run: pip install -r web/requirements-dev.txt
+
+      # The suite runs against a stub tttool, so it needs no Haskell toolchain.
+      - run: python -m pytest tests -q
+        working-directory: web
+
+  image:
+    name: Build image
+    needs: web-tests
+    runs-on: ubuntu-latest
+    # Compiling tttool from source with GHC is the slow part; the layer cache
+    # below makes every build after the first one a lot quicker.
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: tttool-web:ci
+          build-args: |
+            TTTOOL_SOURCE=${{ inputs.tttool_source || 'build' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test
+        run: |
+          set -euo pipefail
+
+          docker run -d --name tttool-web -p 8080:8080 tttool-web:ci
+          trap 'docker logs tttool-web || true; docker rm -f tttool-web > /dev/null 2>&1 || true' EXIT
+
+          echo "::group::waiting for the container to come up"
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8080/healthz; then found=yes; break; fi
+            sleep 2
+          done
+          echo
+          test "${found:-no}" = yes
+          echo "::endgroup::"
+
+          docker exec tttool-web tttool --help > /dev/null
+          echo "text to speech engine:"
+          docker exec tttool-web sh -c 'command -v pico2wave || command -v espeak'
+          docker exec tttool-web sh -c 'command -v oggenc && command -v ffmpeg' > /dev/null
+
+          # Build a GME file through the web API, the way a user would.
+          curl -fsS -o /dev/null -X POST http://127.0.0.1:8080/projects \
+            --data 'name=ci&start=example'
+
+          run() {
+            curl -fsS -X POST "http://127.0.0.1:8080/p/ci/run" --data "$1"
+          }
+
+          echo "::group::assemble"
+          result=$(run 'command=assemble&yaml=example.yaml&out=ci.gme')
+          echo "$result"
+          echo "$result" | grep -q '"ok":true'
+          echo "::endgroup::"
+
+          # oid-table exercises the PDF generator and its embedded fonts.
+          echo "::group::oid-table"
+          result=$(run 'command=oid-table&yaml=example.yaml&out=ci.pdf&dpi=1200&pixel_size=2&code_dim=30&image_format=pdf')
+          echo "$result"
+          echo "$result" | grep -q '"ok":true'
+          echo "::endgroup::"
+
+          curl -fsS -o ci.gme 'http://127.0.0.1:8080/p/ci/download?path=ci.gme'
+          test -s ci.gme
+          docker exec tttool-web tttool info /data/ci/ci.gme
+
+      - name: Log in to ghcr.io
+        if: github.event_name == 'push' || inputs.push
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image metadata
+        if: github.event_name == 'push' || inputs.push
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short
+
+      - name: Push image
+        if: github.event_name == 'push' || inputs.push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            TTTOOL_SOURCE=${{ inputs.tttool_source || 'build' }}
+          # Everything is in the cache from the build step above already.
+          cache-from: type=gha

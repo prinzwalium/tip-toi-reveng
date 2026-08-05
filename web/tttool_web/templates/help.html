@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Commands{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <h1>What the buttons do</h1>
+  <p class="muted">
+    Every action in this GUI is a plain <code>tttool</code> invocation inside the project
+    directory. The exact command line is shown above each result, so anything you do here can
+    be reproduced on a shell.
+  </p>
+</section>
+
+{% for group in groups %}
+<section class="card">
+  <h2>{{ group }}</h2>
+  <dl class="cmdlist">
+    {% for c in commands if c.group == group %}
+      <dt><code>tttool {{ c.label }}</code></dt>
+      <dd>
+        {{ c.description }}
+        {% if c.note %}<span class="note inline-note">{{ c.note }}</span>{% endif %}
+      </dd>
+    {% endfor %}
+  </dl>
+</section>
+{% endfor %}
+
+<section class="card">
+  <h2>Not available in the web GUI</h2>
+  <p class="muted">
+    <code>tttool play</code> is an interactive terminal simulation and has no browser
+    equivalent; run it from a shell inside the container if you need it:
+    <code>docker compose exec tttool-web tttool play /data/&lt;project&gt;/book.yaml</code>.
+  </p>
+</section>
+
+<section class="card">
+  <h2>Text to speech</h2>
+  <p class="muted">
+    Instead of recording every sample you can add a <code>speak:</code> section to your YAML
+    file (see <code>text2speech.yaml</code> in the repository) and let tttool synthesize them.
+    The container ships pico2wave, espeak-ng and oggenc for that; generated samples are cached
+    in the project's <code>tts-cache/</code> directory.
+  </p>
+</section>
+{% endblock %}

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}{{ relpath }}{% endblock %}
+
+{% block content %}
+<section class="hero project-head">
+  <div>
+    <h1>{{ relpath }}</h1>
+    <p class="muted">in project <a href="{{ url_for('project_view', name=project.name) }}">{{ project.name }}</a></p>
+  </div>
+  <a class="button ghost" href="{{ url_for('project_view', name=project.name) }}">← back</a>
+</section>
+
+<section class="card">
+  <form method="post" action="{{ url_for('edit', name=project.name) }}" class="stack editor-form">
+    <input type="hidden" name="path" value="{{ relpath }}">
+    <textarea name="content" id="editor" spellcheck="false" wrap="off">{{ content }}</textarea>
+    <div class="row">
+      <button type="submit">Save &amp; close</button>
+      <button type="submit" name="stay" value="1" class="ghost">Save</button>
+      <span class="hint muted">Tab inserts two spaces — YAML does not like tab characters.</span>
+    </div>
+  </form>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% endblock %}
