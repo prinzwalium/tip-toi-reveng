@@ -87,8 +87,13 @@ ENV LANG=C.UTF-8 \
 # are what tttool needs for its text-to-speech feature.  SVOX pico sounds much
 # better than espeak but lives in Debian's non-free component, so it is optional.
 RUN set -eux; \
-    echo 'deb http://deb.debian.org/debian bookworm main contrib non-free' \
-        > /etc/apt/sources.list.d/tttool-nonfree.list; \
+    printf '%s\n' \
+        'Types: deb' \
+        'URIs: http://deb.debian.org/debian' \
+        'Suites: bookworm' \
+        'Components: contrib non-free' \
+        'Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg' \
+        > /etc/apt/sources.list.d/tttool-nonfree.sources; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
         ca-certificates \
