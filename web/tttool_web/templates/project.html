@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }}{% endblock %}
+
+{% macro field(param, file_choices) %}
+  {% if param.type == 'bool' %}
+    <label class="check">
+      <input type="checkbox" name="{{ param.name }}" value="1"> {{ param.label }}
+    </label>
+  {% else %}
+    <label class="field">
+      <span class="label">{{ param.label }}{% if param.required %} <em>*</em>{% endif %}</span>
+      {% if param.type == 'file' %}
+        {% set grouped = file_choices|by_ext(param.exts) %}
+        <select name="{{ param.name }}" {% if param.required %}required{% endif %}>
+          <option value="">— choose a file —</option>
+          {% for choice in grouped.matching %}
+            <option value="{{ choice }}">{{ choice }}</option>
+          {% endfor %}
+          {% if grouped.other %}
+          <optgroup label="other files">
+            {% for choice in grouped.other %}
+              <option value="{{ choice }}">{{ choice }}</option>
+            {% endfor %}
+          </optgroup>
+          {% endif %}
+        </select>
+      {% elif param.type == 'choice' %}
+        <select name="{{ param.name }}">
+          {% for value, label in param.choices %}
+            <option value="{{ value }}" {% if value == param.default %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      {% elif param.type == 'int' %}
+        <input type="number" name="{{ param.name }}" value="{{ param.default }}"
+               min="{{ param.minimum }}" max="{{ param.maximum }}"
+               placeholder="{{ param.placeholder }}" {% if param.required %}required{% endif %}>
+      {% else %}
+        <input type="text" name="{{ param.name }}" value="{{ param.default }}"
+               placeholder="{{ param.placeholder }}" autocomplete="off"
+               {% if param.required %}required{% endif %}>
+      {% endif %}
+      {% if param.help %}<span class="hint muted">{{ param.help }}</span>{% endif %}
+    </label>
+  {% endif %}
+{% endmacro %}
+
+{% block content %}
+<section class="hero project-head">
+  <div>
+    <h1>{{ project.name }}</h1>
+    <p class="muted">{{ files|selectattr('is_dir', 'equalto', false)|list|length }} files ·
+      <a href="{{ url_for('archive', name=project.name) }}">download as .zip</a></p>
+  </div>
+  <a class="button ghost" href="{{ url_for('index') }}">← all projects</a>
+</section>
+
+<div class="columns">
+  <section class="card col-files">
+    <h2>Files</h2>
+    <div id="file-list">
+      {% include "_files.html" %}
+    </div>
+
+    <details class="drawer" open>
+      <summary>Upload files</summary>
+      <form method="post" action="{{ url_for('upload', name=project.name) }}"
+            enctype="multipart/form-data" class="stack">
+        <input type="file" name="files" multiple required>
+        <label class="field">
+          <span class="label">Sub directory (optional)</span>
+          <input type="text" name="subdir" placeholder="audio" autocomplete="off">
+        </label>
+        <button type="submit">Upload</button>
+        <p class="hint muted">
+          Audio for the pen must be mono Ogg Vorbis at 22050 Hz — upload anything and use
+          the “→ Ogg” button to convert it with ffmpeg.
+        </p>
+      </form>
+    </details>
+
+    <details class="drawer">
+      <summary>New file</summary>
+      <form method="post" action="{{ url_for('new_file', name=project.name) }}" class="row">
+        <input type="text" name="path" placeholder="book.yaml" required autocomplete="off">
+        <button type="submit">Create &amp; edit</button>
+      </form>
+    </details>
+  </section>
+
+  <section class="card col-run">
+    <h2>Run tttool</h2>
+    <div class="cmdbar">
+      {% for group in groups %}
+        <div class="cmdgroup">
+          <span class="grouplabel muted">{{ group }}</span>
+          {% for c in commands if c.group == group %}
+            <button type="button" class="tab{% if c.id == selected %} active{% endif %}"
+                    data-cmd="{{ c.id }}">{{ c.label }}</button>
+          {% endfor %}
+        </div>
+      {% endfor %}
+    </div>
+
+    {% for c in commands %}
+    <form class="cmdform{% if c.id != selected %} hidden{% endif %}" data-cmd="{{ c.id }}"
+          method="post" action="{{ url_for('run_command', name=project.name) }}"
+          {% if c.derive_out %}data-derive="{{ c.derive_out|join(':') }}"{% endif %}>
+      <input type="hidden" name="command" value="{{ c.id }}">
+      <p class="cmddesc">{{ c.description }}</p>
+      {% if c.note %}<p class="note">{{ c.note }}</p>{% endif %}
+      <div class="fields">
+        {% for param in c.params %}
+          {{ field(param, file_choices) }}
+        {% endfor %}
+      </div>
+      {% if c.oid_options %}
+      <details class="drawer">
+        <summary>OID drawing options</summary>
+        <div class="fields">
+          {% for param in oid_params %}
+            {{ field(param, file_choices) }}
+          {% endfor %}
+        </div>
+        <p class="hint muted">
+          Printing needs a laser printer at 1200 dpi; check the handbook before changing these.
+        </p>
+      </details>
+      {% endif %}
+      <div class="row">
+        <button type="submit">Run {{ c.label }}</button>
+      </div>
+    </form>
+    {% endfor %}
+
+    <div id="output" class="output hidden">
+      <div class="outhead">
+        <code id="out-command"></code>
+        <span id="out-status" class="badge"></span>
+        <button type="button" class="ghost" id="out-download">Save output</button>
+        <button type="button" class="ghost" id="out-close">×</button>
+      </div>
+      <pre id="out-text"></pre>
+      <div id="out-files" class="outfiles"></div>
+    </div>
+  </section>
+</div>
+
+<div id="preview" class="modal hidden">
+  <div class="modal-inner">
+    <div class="row modal-head">
+      <strong id="preview-name"></strong>
+      <button type="button" class="ghost" id="preview-close">×</button>
+    </div>
+    <div id="preview-body"></div>
+  </div>
+</div>
+
+<form id="convert-form" method="post" action="{{ url_for('convert', name=project.name) }}" class="hidden">
+  <input type="hidden" name="path">
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% endblock %}

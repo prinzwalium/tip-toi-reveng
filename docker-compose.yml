@@ -1,0 +1,37 @@
+# tttool web GUI
+#
+#   docker compose up -d --build      # first build takes a while, GHC is slow
+#   open http://localhost:8080
+#
+services:
+  tttool-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # "build" compiles tttool from this repository (slow, needs ~4 GB RAM).
+        # "release" downloads the official static x86_64 binary instead.
+        TTTOOL_SOURCE: build
+    image: tttool-web:latest
+    container_name: tttool-web
+    restart: unless-stopped
+    init: true
+    ports:
+      - "8080:8080"
+    volumes:
+      # Projects live here. Use a bind mount such as ./data:/data if you would
+      # rather have the files in a directory on the host; that directory has to
+      # be writable by uid 1000 (chown -R 1000:1000 ./data).
+      - tttool-data:/data
+    environment:
+      # Uncomment both to protect the GUI with HTTP basic auth. Put it behind a
+      # reverse proxy with TLS if it is reachable from the internet.
+      # TTTOOL_WEB_USER: tiptoi
+      # TTTOOL_WEB_PASSWORD: change-me
+      TTTOOL_WEB_MAX_UPLOAD_MB: "512"
+      TTTOOL_WEB_TIMEOUT: "300"
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  tttool-data:

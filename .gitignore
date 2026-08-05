@@ -15,3 +15,8 @@ cabal.project.local
 dist-newstyle
 tts-cache
 .ghc.environment*
+__pycache__
+.pytest_cache
+*.pyc
+web/.venv
+/data

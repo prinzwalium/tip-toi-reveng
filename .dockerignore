@@ -1,0 +1,26 @@
+# Keep the build context small; the Dockerfile copies what it needs explicitly.
+.git
+.github
+dist-newstyle
+dist
+result
+result-*
+gh-pages
+tts-cache
+*.gme
+*.upd
+*.hi
+*.o
+tttool
+libtiptoi
+gameanalyse
+makegraphic
+book/_build
+testsuite/input
+contrib
+data
+**/__pycache__
+**/.pytest_cache
+**/*.pyc
+.venv
+venv

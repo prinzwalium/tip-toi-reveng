@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}tttool{% endblock %} · tttool web</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="{{ url_for('index') }}">
+    <span class="dot"></span> tttool <span class="muted">web</span>
+  </a>
+  <nav>
+    <a href="{{ url_for('index') }}">Projects</a>
+    <a href="{{ url_for('help_page') }}">Commands</a>
+    <a href="https://tttool.readthedocs.io/de/latest/" target="_blank" rel="noopener">Handbuch</a>
+  </nav>
+  <span class="version muted">tttool {{ tttool_version }}</span>
+</header>
+
+<main>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <ul class="flashes">
+        {% for category, message in messages %}
+          <li class="flash {{ category }}">{{ message }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  {% endwith %}
+
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="muted">
+  tttool web {{ app_version }} — a browser front end for
+  <a href="https://github.com/entropia/tip-toi-reveng" target="_blank" rel="noopener">tip-toi-reveng</a>.
+</footer>
+{% block scripts %}{% endblock %}
+</body>
+</html>
