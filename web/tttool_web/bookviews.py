@@ -25,6 +25,12 @@ JS_STRINGS = [
     "No sound yet — the area stays silent.",
     "Print this",
     "Copy this onto the pen",
+    "Print test page first",
+    "Delete this page with everything on it?",
+    "Click the corners; click the first one again to close the shape.",
+    "Done",
+    "Page {number}",
+    "Drag on the picture to create an area.",
 ]
 
 
@@ -195,6 +201,51 @@ def register_book_routes(app, route, get_project):
         payload["pdf_url"] = (
             url_for("download", name=project.name, path=result.pdf) if result.pdf else ""
         )
+        payload["test_pdf_url"] = (
+            url_for("download", name=project.name, path=result.test_pdf) if result.test_pdf else ""
+        )
         return jsonify(payload)
+
+    # -- pages ------------------------------------------------------------
+
+    @route("/b/<name>/pages", methods=["POST"])
+    def add_page(name):
+        project, book = get_book_project(name)
+        page = book.add_page()
+        book.save(project)
+        return jsonify({"ok": True, "book": book.to_dict(), "page": page.id})
+
+    @route("/b/<name>/pages/<page_id>/duplicate", methods=["POST"])
+    def duplicate_page(name, page_id):
+        project, book = get_book_project(name)
+        page = book.duplicate_page(book.page(page_id))
+        book.save(project)
+        return jsonify({"ok": True, "book": book.to_dict(), "page": page.id})
+
+    @route("/b/<name>/pages/<page_id>/delete", methods=["POST"])
+    def delete_page(name, page_id):
+        project, book = get_book_project(name)
+        book.remove_page(page_id)
+        book.save(project)
+        return jsonify({"ok": True, "book": book.to_dict(), "page": book.pages[0].id})
+
+    @route("/b/<name>/pages/<page_id>/move", methods=["POST"])
+    def move_page(name, page_id):
+        project, book = get_book_project(name)
+        delta = -1 if (request.form.get("direction") or request.args.get("direction")) == "up" else 1
+        book.move_page(page_id, delta)
+        book.save(project)
+        return jsonify({"ok": True, "book": book.to_dict(), "page": page_id})
+
+    @route("/b/<name>/areas/<area_id>/duplicate", methods=["POST"])
+    def duplicate_area(name, area_id):
+        project, book = get_book_project(name)
+        for page in book.pages:
+            for area in page.areas:
+                if area.id == area_id:
+                    copy = book.duplicate_area(page, area)
+                    book.save(project)
+                    return jsonify({"ok": True, "book": book.to_dict(), "area": copy.id})
+        raise ProjectError(t("This area no longer exists."))
 
     return app

@@ -25,12 +25,19 @@
   <section class="card book-canvas-card">
     <div class="row book-toolbar">
       <strong>{{ t("Page") }}</strong>
-      <select id="page-picker">
-        {% for page in book.pages %}
-          <option value="{{ page.id }}">{{ page.name or page.id }}</option>
-        {% endfor %}
-      </select>
+      <select id="page-picker"></select>
+      <input type="text" id="page-name" class="page-name" autocomplete="off"
+             data-tip="{{ t('The name of this page — only you see it.') }}">
+      <button type="button" id="page-up" class="ghost" data-tip="{{ t('Move page forward.') }}">↑</button>
+      <button type="button" id="page-down" class="ghost" data-tip="{{ t('Move page back.') }}">↓</button>
+      <button type="button" id="page-add" class="ghost" data-tip="{{ t('Add another page.') }}">+ {{ t("Page") }}</button>
+      <button type="button" id="page-duplicate" class="ghost"
+              data-tip="{{ t('Copy this page with all its areas.') }}">⧉</button>
+      <button type="button" id="page-delete" class="ghost danger"
+              data-tip="{{ t('Delete this page with everything on it.') }}">×</button>
+    </div>
 
+    <div class="row book-toolbar">
       <label class="button ghost file-button"
              data-tip="{{ t('A photo or scan of the page you want to make tappable.') }}">
         {{ t("Choose picture …") }}
@@ -39,9 +46,12 @@
 
       <button type="button" id="add-area" class="ghost"
               data-tip="{{ t('Then drag a rectangle onto the picture.') }}">+ {{ t("Area") }}</button>
+      <button type="button" id="add-polygon" class="ghost"
+              data-tip="{{ t('For anything that is not a rectangle: click the corners, close it by clicking the first one again.') }}">
+        + {{ t("Free shape") }}</button>
       <button type="button" id="undo" class="ghost" data-tip="{{ t('Undo the last change (Ctrl+Z).') }}">↶</button>
       <span class="grow"></span>
-      <span class="muted hint">{{ t("Drag on the picture to create an area.") }}</span>
+      <span id="canvas-hint" class="muted hint">{{ t("Drag on the picture to create an area.") }}</span>
     </div>
 
     <div id="stage" class="stage">
@@ -93,7 +103,11 @@
         <audio id="sound-player" hidden></audio>
       </div>
 
-      <button type="button" id="area-delete" class="ghost danger">{{ t("Delete area") }}</button>
+      <div class="row">
+        <button type="button" id="area-duplicate" class="ghost"
+                data-tip="{{ t('Same shape and size once more — for a second animal of the same kind.') }}">{{ t("Duplicate") }}</button>
+        <button type="button" id="area-delete" class="ghost danger">{{ t("Delete area") }}</button>
+      </div>
     </div>
 
     <div class="drawer">
@@ -119,6 +133,11 @@
      data-image="{{ url_for('upload_page_image', name=project.name, page_id='PAGE') }}"
      data-sound="{{ url_for('upload_area_sound', name=project.name, area_id='AREA') }}"
      data-sound-delete="{{ url_for('delete_area_sound', name=project.name, area_id='AREA') }}"
+     data-area-duplicate="{{ url_for('duplicate_area', name=project.name, area_id='AREA') }}"
+     data-page-add="{{ url_for('add_page', name=project.name) }}"
+     data-page-duplicate="{{ url_for('duplicate_page', name=project.name, page_id='PAGE') }}"
+     data-page-delete="{{ url_for('delete_page', name=project.name, page_id='PAGE') }}"
+     data-page-move="{{ url_for('move_page', name=project.name, page_id='PAGE') }}"
      data-build="{{ url_for('build_book', name=project.name) }}"
      data-raw="{{ url_for('raw', name=project.name, path='PATH') }}"
      hidden></div>

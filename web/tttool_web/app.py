@@ -100,6 +100,11 @@ def create_app() -> Flask:
         "upload_area_sound",
         "delete_area_sound",
         "build_book",
+        "add_page",
+        "duplicate_page",
+        "delete_page",
+        "move_page",
+        "duplicate_area",
     }
 
     def wants_json() -> bool:

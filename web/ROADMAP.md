@@ -86,17 +86,19 @@ screen and in CI (true size, patterns inside the painted areas), but not yet
 with a real printer and a real pen. That is the first thing to try on the beta.
 
 
-Milestone 2 — books that are actually books
--------------------------------------------
+Milestone 2 — books that are actually books ✅
+----------------------------------------------
 
-*Target version 1.2 · everything M1 left out that a real project needs*
+*Shipped in 1.2 · everything M1 left out that a real project needs*
 
 * Several pages per book, reorderable, each with its own picture.
-* Areas that are not rectangles: polygons and freehand shapes, so a lake or an
-  animal can be tapped exactly where it is drawn.
-* A **test page** to print before the whole book: a few codes at the size you
-  will use, with instructions for checking them with the pen. This is the
-  cheapest possible answer to “will my printer work for this?”.
+* Areas that are not rectangles: polygons, so a lake or an animal can be tapped
+  exactly where it is drawn. (Freehand drawing, as opposed to clicking corners,
+  is still open.)
+* A **test page** to print before the whole book: the same code at 8–30 mm with
+  instructions for checking it with the pen. This is the cheapest possible
+  answer to “will my printer work for this?”, and it tells the user the
+  smallest area size their printer supports.
 * Print safeguards: a PDF that carries its true size, a printed ruler mark to
   verify the scale, a warning for areas smaller than the pen can read reliably,
   and a warning when the artwork under an area is so dark that the dots will

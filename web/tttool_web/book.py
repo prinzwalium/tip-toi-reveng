@@ -11,7 +11,7 @@ drift apart.
 
 import json
 import re
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 
 from .i18n import t
@@ -54,16 +54,46 @@ class Area:
     y: float = 0.0
     w: float = 20.0
     h: float = 20.0
+    #: "rect" or "poly"; a polygon keeps its corners in ``points``, and x/y/w/h
+    #: stay its bounding box so that every check works on both kinds.
+    kind: str = "rect"
+    points: list[list[float]] = field(default_factory=list)
     #: Path of the sound inside the project, empty while none is assigned.
     sound: str = ""
     #: What the user called the file they uploaded, for display only.
     sound_name: str = ""
 
+    @property
+    def is_polygon(self) -> bool:
+        return self.kind == "poly" and len(self.points) >= 3
+
     def clamp(self, page_w: float, page_h: float) -> None:
+        if self.kind == "poly" and self.points:
+            self.points = [
+                [
+                    round(max(0.0, min(float(px), page_w)), 2),
+                    round(max(0.0, min(float(py), page_h)), 2),
+                ]
+                for px, py in self.points
+            ]
+            if len(self.points) >= 3:
+                xs = [p[0] for p in self.points]
+                ys = [p[1] for p in self.points]
+                self.x, self.y = min(xs), min(ys)
+                self.w, self.h = max(max(xs) - self.x, 1.0), max(max(ys) - self.y, 1.0)
+                return
+            # Too few corners left to be a shape; fall back to its box.
+            self.kind, self.points = "rect", []
         self.w = max(1.0, min(round(self.w, 2), page_w))
         self.h = max(1.0, min(round(self.h, 2), page_h))
         self.x = max(0.0, min(round(self.x, 2), page_w - self.w))
         self.y = max(0.0, min(round(self.y, 2), page_h - self.h))
+
+    def move_to(self, x: float, y: float) -> None:
+        """Move the whole shape so that its bounding box starts at (x, y)."""
+        dx, dy = x - self.x, y - self.y
+        self.points = [[px + dx, py + dy] for px, py in self.points]
+        self.x, self.y = x, y
 
     def overlaps(self, other: "Area") -> bool:
         return not (
@@ -139,6 +169,46 @@ class Book:
         page.areas.append(area)
         return area
 
+    # -- rearranging ------------------------------------------------------
+
+    def duplicate_area(self, page: Page, area: Area) -> Area:
+        page_w, page_h = self.page_size
+        copy = replace(area, id=_next_id("a", {a.id for p in self.pages for a in p.areas}))
+        copy.points = [list(point) for point in area.points]
+        copy.name = f"{area.name} (2)" if area.name else ""
+        # Offset a little so the copy is visible on top of the original.
+        copy.move_to(min(area.x + 5, max(0.0, page_w - area.w)),
+                     min(area.y + 5, max(0.0, page_h - area.h)))
+        copy.sound = copy.sound_name = ""
+        copy.clamp(page_w, page_h)
+        page.areas.append(copy)
+        return copy
+
+    def duplicate_page(self, page: Page) -> Page:
+        copy = Page(id=_next_id("s", {p.id for p in self.pages}),
+                    name=f"{page.name or page.id} (2)", image=page.image)
+        taken = {a.id for p in self.pages for a in p.areas}
+        for area in page.areas:
+            new = replace(area, id=_next_id("a", taken))
+            new.points = [list(point) for point in area.points]
+            # Sounds belong to one area each; the copy starts silent.
+            new.sound = new.sound_name = ""
+            taken.add(new.id)
+            copy.areas.append(new)
+        self.pages.insert(self.pages.index(page) + 1, copy)
+        return copy
+
+    def remove_page(self, page_id: str) -> None:
+        if len(self.pages) <= 1:
+            raise ProjectError(t("A book needs at least one page."))
+        self.pages = [p for p in self.pages if p.id != page_id]
+
+    def move_page(self, page_id: str, delta: int) -> None:
+        page = self.page(page_id)
+        index = self.pages.index(page)
+        target = max(0, min(len(self.pages) - 1, index + delta))
+        self.pages.insert(target, self.pages.pop(index))
+
     # -- persistence ------------------------------------------------------
 
     @classmethod
@@ -162,6 +232,7 @@ class Book:
             if not ID_RE.match(page.id):
                 page.id = _next_id("s", {p.id for p in book.pages})
             for raw_area in raw_page.get("areas") or []:
+                points = raw_area.get("points") or []
                 area = Area(
                     id=str(raw_area.get("id") or ""),
                     name=str(raw_area.get("name") or "")[:80],
@@ -169,6 +240,12 @@ class Book:
                     y=float(raw_area.get("y") or 0),
                     w=float(raw_area.get("w") or 20),
                     h=float(raw_area.get("h") or 20),
+                    kind="poly" if raw_area.get("kind") == "poly" else "rect",
+                    points=[
+                        [float(p[0]), float(p[1])]
+                        for p in points[:200]
+                        if isinstance(p, (list, tuple)) and len(p) == 2
+                    ],
                     sound=str(raw_area.get("sound") or ""),
                     sound_name=str(raw_area.get("sound_name") or "")[:120],
                 )
@@ -203,6 +280,62 @@ class Book:
         return (project.path / BOOK_FILE).is_file()
 
     # -- checks -----------------------------------------------------------
+
+    #: Below this average brightness (0–255) the dots drown in the artwork.
+    DARK_LIMIT = 110
+
+    def dark_area_hints(self, project: Project) -> list[str]:
+        """Warn about areas whose artwork is too dark for the pen to read."""
+        try:
+            from PIL import Image
+        except ImportError:
+            return []
+
+        hints: list[str] = []
+        page_w, page_h = self.page_size
+        for page in self.pages:
+            if not page.image:
+                continue
+            path = project.path / page.image
+            if not path.is_file():
+                continue
+            try:
+                with Image.open(path) as picture:
+                    grey = picture.convert("L")
+                    image_w, image_h = grey.size
+                    ox, oy, fitted_w, fitted_h = fitted_image_rect(
+                        page_w, page_h, image_w, image_h
+                    )
+                    if fitted_w <= 0 or fitted_h <= 0:
+                        continue
+                    for area in page.areas:
+                        if not area.sound:
+                            continue
+                        left = (area.x - ox) / fitted_w * image_w
+                        top = (area.y - oy) / fitted_h * image_h
+                        right = (area.x + area.w - ox) / fitted_w * image_w
+                        bottom = (area.y + area.h - oy) / fitted_h * image_h
+                        box = (
+                            int(max(0, min(left, image_w - 1))),
+                            int(max(0, min(top, image_h - 1))),
+                            int(max(1, min(right, image_w))),
+                            int(max(1, min(bottom, image_h))),
+                        )
+                        if box[2] <= box[0] or box[3] <= box[1]:
+                            continue
+                        # One byte per pixel in "L" mode, so this is the mean.
+                        pixels = grey.crop(box).resize((16, 16)).tobytes()
+                        brightness = sum(pixels) / len(pixels)
+                        if brightness < self.DARK_LIMIT:
+                            hints.append(
+                                t("“{name}” on “{label}” sits on a dark part of the picture — "
+                                  "the pen may not read the dots there.",
+                                  name=area.name or t("Unnamed area"),
+                                  label=page.name or page.id)
+                            )
+            except OSError:
+                continue
+        return hints
 
     def check(self) -> tuple[list[str], list[str]]:
         """Return (problems, hints) in plain language, ready to show."""
@@ -248,6 +381,21 @@ class Book:
                         )
                         break
         return problems, hints
+
+
+def fitted_image_rect(
+    page_w: float, page_h: float, image_w: int, image_h: int
+) -> tuple[float, float, float, float]:
+    """Where a picture lands on the page, in mm.
+
+    The same “contain and centre” fit is used by the editor, the printed page
+    and the check for artwork that is too dark, so the three cannot disagree.
+    """
+    if image_w <= 0 or image_h <= 0:
+        return 0.0, 0.0, page_w, page_h
+    scale = min(page_w / image_w, page_h / image_h)
+    width, height = image_w * scale, image_h * scale
+    return (page_w - width) / 2, (page_h - height) / 2, width, height
 
 
 def store_upload(project: Project, subdir: str, basename: str, upload) -> tuple[str, str]:

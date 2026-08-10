@@ -7,6 +7,26 @@ YYYY-MM-DD.
 Unreleased
 ----------
 
+1.2.0 — books that are actually books
+-------------------------------------
+
+Milestone 2 of `ROADMAP.md`.
+
+* **Several pages per book**: add, rename, duplicate, reorder and delete pages;
+  every page gets its own picture and its own printed sheet, and they are bound
+  into one PDF.
+* **Free shapes**: an area no longer has to be a rectangle. Click the corners
+  of a lake or an animal and close the outline by clicking the first corner
+  again; the corners can be dragged afterwards. Printed as a polygon, so the
+  dots stop exactly where the shape does.
+* **Print test page** (*Druckprobe*): the same code printed at 8, 10, 12, 15,
+  20 and 30 mm, with the power-on field and instructions. Tap the squares with
+  the pen and the smallest one that answers is the smallest area your printer
+  can do. It is offered before the book itself.
+* **Dark artwork is flagged**: areas sitting on a dark part of the picture are
+  pointed out before printing, because the pen cannot read dots there.
+* **Duplicate an area** with the same shape and size.
+
 1.1.0 — the book editor
 -----------------------
 

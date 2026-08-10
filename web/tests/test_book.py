@@ -292,3 +292,152 @@ def test_codes_stay_the_same_when_the_book_is_built_again(client, built):
     name, first = built
     second = client.post(f"/b/{name}/build").get_json()
     assert first["codes"] == second["codes"]
+
+
+def test_build_offers_a_test_page(client, built):
+    name, result = built
+    assert result["test_pdf"].endswith("druckprobe.pdf")
+    assert (client.data_dir / name / result["test_pdf"]).is_file()
+    svg = (client.data_dir / name / "druck" / "druckprobe.svg").read_text()
+    # every offered size, so the user can find their printer's limit
+    for size in (8, 10, 12, 15, 20):
+        assert f">{size} mm<" in svg
+    assert "100%" in svg
+
+
+# -- several pages ----------------------------------------------------------
+
+
+def test_pages_can_be_added_duplicated_moved_and_deleted(client):
+    name = make_book(client)
+    put_areas(client, name, [{"id": "a1", "name": "Hund", "x": 10, "y": 10, "w": 40, "h": 30}])
+    add_sound(client, name, "a1")
+
+    added = client.post(f"/b/{name}/pages").get_json()
+    assert len(added["book"]["pages"]) == 2
+
+    duplicated = client.post(f"/b/{name}/pages/s1/duplicate").get_json()
+    pages = duplicated["book"]["pages"]
+    assert len(pages) == 3
+    copy = pages[1]
+    assert copy["image"] == pages[0]["image"]
+    assert [a["name"] for a in copy["areas"]] == ["Hund"]
+    # the copy starts silent: one sound belongs to one area
+    assert copy["areas"][0]["sound"] == ""
+    assert copy["areas"][0]["id"] != "a1"
+
+    moved = client.post(f"/b/{name}/pages/s1/move", data={"direction": "down"}).get_json()
+    assert [p["id"] for p in moved["book"]["pages"]][0] != "s1"
+
+    deleted = client.post(f"/b/{name}/pages/s1/delete").get_json()
+    assert "s1" not in [p["id"] for p in deleted["book"]["pages"]]
+
+
+def test_the_last_page_cannot_be_deleted(client):
+    name = make_book(client)
+    response = client.post(f"/b/{name}/pages/s1/delete")
+    assert response.status_code == 400
+    assert "at least one page" in response.get_json()["error"]
+
+
+def test_every_page_gets_its_own_printed_sheet(client):
+    name = make_book(client, "Zwei Seiten")
+    put_areas(client, name, [{"id": "a1", "name": "Hund", "x": 10, "y": 10, "w": 40, "h": 30}])
+    add_sound(client, name, "a1")
+    client.post(f"/b/{name}/pages/s1/duplicate")
+    book = client.get(f"/b/{name}/data").get_json()
+    second = book["pages"][1]
+    second["areas"][0]["name"] = "Katze"
+    client.put(f"/b/{name}/data", json=book)
+    add_sound(client, name, second["areas"][0]["id"])
+
+    result = client.post(f"/b/{name}/build").get_json()
+    assert result["ok"], result
+    assert len(result["pages"]) == 2
+    assert {entry["area"] for entry in result["codes"]} == {"Hund", "Katze"}
+    # two different codes, so the pen can tell the pages apart
+    assert len({entry["code"] for entry in result["codes"]}) == 2
+
+    from pypdf import PdfReader
+
+    assert len(PdfReader(str(client.data_dir / name / result["pdf"])).pages) == 2
+
+
+# -- free shapes ------------------------------------------------------------
+
+
+def test_a_polygon_is_stored_with_its_bounding_box(client):
+    name = make_book(client)
+    put_areas(
+        client,
+        name,
+        [{"id": "a1", "name": "See", "kind": "poly",
+          "points": [[20, 30], [60, 25], [70, 60], [30, 70]]}],
+    )
+    area = json.loads((client.data_dir / name / "book.json").read_text())["pages"][0]["areas"][0]
+    assert area["kind"] == "poly"
+    assert area["x"] == 20 and area["y"] == 25
+    assert area["w"] == 50 and area["h"] == 45
+
+
+def test_a_polygon_is_printed_as_a_polygon(client):
+    name = make_book(client)
+    put_areas(
+        client,
+        name,
+        [{"id": "a1", "name": "See", "kind": "poly",
+          "points": [[20, 30], [60, 25], [70, 60], [30, 70]]}],
+    )
+    add_sound(client, name, "a1")
+    result = client.post(f"/b/{name}/build").get_json()
+    assert result["ok"], result
+    svg = (client.data_dir / name / "druck" / "seite-1.svg").read_text()
+    assert '<polygon points="960.0,1440.0' in svg  # 20 mm * 48 units, 30 mm * 48
+    assert 'fill="url(#oid-s1_a1)"' in svg
+
+
+def test_a_polygon_with_too_few_corners_falls_back_to_a_rectangle(client):
+    name = make_book(client)
+    put_areas(client, name, [{"id": "a1", "kind": "poly", "points": [[10, 10], [20, 20]],
+                              "x": 10, "y": 10, "w": 30, "h": 20}])
+    area = json.loads((client.data_dir / name / "book.json").read_text())["pages"][0]["areas"][0]
+    assert area["kind"] == "rect"
+
+
+# -- duplicating areas ------------------------------------------------------
+
+
+def test_duplicating_an_area_keeps_shape_but_not_sound(client):
+    name = make_book(client)
+    put_areas(client, name, [{"id": "a1", "name": "Hund", "x": 10, "y": 10, "w": 40, "h": 30}])
+    add_sound(client, name, "a1")
+    result = client.post(f"/b/{name}/areas/a1/duplicate").get_json()
+    areas = result["book"]["pages"][0]["areas"]
+    assert len(areas) == 2
+    copy = areas[1]
+    assert copy["w"] == 40 and copy["h"] == 30
+    assert copy["sound"] == ""
+    assert copy["id"] != "a1"
+
+
+# -- dark artwork -----------------------------------------------------------
+
+
+def test_dark_artwork_under_an_area_is_flagged(client):
+    pytest.importorskip("PIL")
+    from PIL import Image
+
+    name = make_book(client)
+    dark = Image.new("RGB", (600, 400), (12, 12, 14))
+    buffer = io.BytesIO()
+    dark.save(buffer, format="PNG")
+    buffer.seek(0)
+    client.post(
+        f"/b/{name}/pages/s1/image",
+        data={"image": (buffer, "dunkel.png")},
+        content_type="multipart/form-data",
+    )
+    put_areas(client, name, [{"id": "a1", "name": "Nacht", "x": 60, "y": 40, "w": 40, "h": 30}])
+    add_sound(client, name, "a1")
+    hints = client.post(f"/b/{name}/build").get_json()["hints"]
+    assert any("dark part" in hint for hint in hints)
