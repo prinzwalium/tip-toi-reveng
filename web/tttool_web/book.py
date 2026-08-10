@@ -18,7 +18,8 @@ from .i18n import t
 from .projects import Project, ProjectError, sanitize_filename
 
 BOOK_FILE = "book.json"
-FORMAT_VERSION = 1
+#: 1 = one sound file per area; 2 = a sound library the areas point into.
+FORMAT_VERSION = 2
 
 #: Paper sizes offered in the interface, in millimetres.
 PAPER_SIZES: dict[str, tuple[int, int]] = {
@@ -37,6 +38,8 @@ POWER_FIELD_MARGIN_MM = 8.0
 
 IMAGE_SUFFIXES = (".png", ".jpg", ".jpeg", ".gif")
 ID_RE = re.compile(r"^[a-z][a-z0-9]{0,15}$")
+#: Sound paths as written by version 1 of the format: sounds/<area>.ogg
+LEGACY_SOUND_RE = re.compile(r"^sounds/[A-Za-z0-9._-]{1,64}\.(ogg|wav|mp3)$")
 
 
 def _next_id(prefix: str, taken: set[str]) -> str:
@@ -44,6 +47,21 @@ def _next_id(prefix: str, taken: set[str]) -> str:
     while f"{prefix}{n}" in taken:
         n += 1
     return f"{prefix}{n}"
+
+
+@dataclass
+class Sound:
+    """One recording in the book's sound library, usable by several areas."""
+
+    id: str
+    name: str = ""
+    #: Path inside the project; always the converted Ogg the pen can play.
+    file: str = ""
+    #: "upload", "record" or "speak" — only used to explain it in the interface.
+    source: str = "upload"
+    #: For spoken sounds: what was said, so it can be edited and spoken again.
+    text: str = ""
+    language: str = ""
 
 
 @dataclass
@@ -58,10 +76,8 @@ class Area:
     #: stay its bounding box so that every check works on both kinds.
     kind: str = "rect"
     points: list[list[float]] = field(default_factory=list)
-    #: Path of the sound inside the project, empty while none is assigned.
-    sound: str = ""
-    #: What the user called the file they uploaded, for display only.
-    sound_name: str = ""
+    #: Which sound of the library plays here; empty while the area is silent.
+    sound_id: str = ""
 
     @property
     def is_polygon(self) -> bool:
@@ -125,6 +141,7 @@ class Book:
     product_id: int = 42
     paper: str = DEFAULT_PAPER
     pages: list[Page] = field(default_factory=list)
+    sounds: list[Sound] = field(default_factory=list)
     version: int = FORMAT_VERSION
 
     # -- geometry ---------------------------------------------------------
@@ -151,6 +168,33 @@ class Book:
             if page.id == page_id:
                 return page
         raise ProjectError(f"No such page: {page_id}")
+
+    def sound(self, sound_id: str) -> Sound:
+        for sound in self.sounds:
+            if sound.id == sound_id:
+                return sound
+        raise ProjectError(t("This sound is not in the library any more."))
+
+    def add_sound(self, **kwargs) -> Sound:
+        sound = Sound(id=_next_id("t", {s.id for s in self.sounds}), **kwargs)
+        self.sounds.append(sound)
+        return sound
+
+    def sound_usage(self) -> dict[str, int]:
+        """How many areas play each sound — shown before deleting one."""
+        usage = {sound.id: 0 for sound in self.sounds}
+        for page in self.pages:
+            for area in page.areas:
+                if area.sound_id in usage:
+                    usage[area.sound_id] += 1
+        return usage
+
+    def area(self, area_id: str) -> tuple[Page, Area]:
+        for page in self.pages:
+            for area in page.areas:
+                if area.id == area_id:
+                    return page, area
+        raise ProjectError(t("This area no longer exists."))
 
     def script_name(self, page: Page, area: Area) -> str:
         """The name this area gets in the YAML file, stable over renames."""
@@ -179,7 +223,6 @@ class Book:
         # Offset a little so the copy is visible on top of the original.
         copy.move_to(min(area.x + 5, max(0.0, page_w - area.w)),
                      min(area.y + 5, max(0.0, page_h - area.h)))
-        copy.sound = copy.sound_name = ""
         copy.clamp(page_w, page_h)
         page.areas.append(copy)
         return copy
@@ -189,10 +232,10 @@ class Book:
                     name=f"{page.name or page.id} (2)", image=page.image)
         taken = {a.id for p in self.pages for a in p.areas}
         for area in page.areas:
+            # The sound comes along: one sound of the library can play in as
+            # many places as you like.
             new = replace(area, id=_next_id("a", taken))
             new.points = [list(point) for point in area.points]
-            # Sounds belong to one area each; the copy starts silent.
-            new.sound = new.sound_name = ""
             taken.add(new.id)
             copy.areas.append(new)
         self.pages.insert(self.pages.index(page) + 1, copy)
@@ -221,8 +264,10 @@ class Book:
             paper=data.get("paper") if data.get("paper") in PAPER_SIZES else DEFAULT_PAPER,
         )
         if not 1 <= book.product_id <= 999:
-            raise ProjectError("The product number must be between 1 and 999")
+            raise ProjectError(t("The product number must be between 1 and 999"))
         page_w, page_h = book.page_size
+        #: Areas of books written before the library existed, {area id: (path, name)}.
+        legacy: dict[str, tuple[str, str]] = {}
         for raw_page in data.get("pages") or []:
             page = Page(
                 id=str(raw_page.get("id") or ""),
@@ -233,6 +278,7 @@ class Book:
                 page.id = _next_id("s", {p.id for p in book.pages})
             for raw_area in raw_page.get("areas") or []:
                 points = raw_area.get("points") or []
+                legacy_sound = str(raw_area.get("sound") or "")
                 area = Area(
                     id=str(raw_area.get("id") or ""),
                     name=str(raw_area.get("name") or "")[:80],
@@ -246,14 +292,53 @@ class Book:
                         for p in points[:200]
                         if isinstance(p, (list, tuple)) and len(p) == 2
                     ],
-                    sound=str(raw_area.get("sound") or ""),
-                    sound_name=str(raw_area.get("sound_name") or "")[:120],
+                    sound_id=str(raw_area.get("sound_id") or ""),
                 )
                 if not ID_RE.match(area.id):
                     area.id = _next_id("a", {a.id for p in book.pages for a in p.areas})
                 area.clamp(page_w, page_h)
+                # Only a path this program wrote itself may be adopted; the
+                # field also arrives from the browser, which must not be able
+                # to point a sound anywhere it likes.
+                if legacy_sound and LEGACY_SOUND_RE.match(legacy_sound):
+                    legacy[area.id] = (legacy_sound, str(raw_area.get("sound_name") or ""))
                 page.areas.append(area)
             book.pages.append(page)
+
+        for raw_sound in data.get("sounds") or []:
+            sound = Sound(
+                id=str(raw_sound.get("id") or ""),
+                name=str(raw_sound.get("name") or "")[:120],
+                file=str(raw_sound.get("file") or ""),
+                source=str(raw_sound.get("source") or "upload")[:16],
+                text=str(raw_sound.get("text") or "")[:500],
+                language=str(raw_sound.get("language") or "")[:16],
+            )
+            if ID_RE.match(sound.id) and sound.file:
+                book.sounds.append(sound)
+
+        # Books written before the library existed carried the file on the area.
+        for page in book.pages:
+            for area in page.areas:
+                if area.id not in legacy:
+                    continue
+                path, name = legacy[area.id]
+                existing = next((s for s in book.sounds if s.file == path), None)
+                if existing is None:
+                    existing = Sound(
+                        id=_next_id("t", {s.id for s in book.sounds}),
+                        name=name or Path(path).stem,
+                        file=path,
+                    )
+                    book.sounds.append(existing)
+                area.sound_id = existing.id
+
+        known = {s.id for s in book.sounds}
+        for page in book.pages:
+            for area in page.areas:
+                if area.sound_id not in known:
+                    area.sound_id = ""
+
         if not book.pages:
             book.add_page()
         return book
@@ -309,7 +394,7 @@ class Book:
                     if fitted_w <= 0 or fitted_h <= 0:
                         continue
                     for area in page.areas:
-                        if not area.sound:
+                        if not area.sound_id:
                             continue
                         left = (area.x - ox) / fitted_w * image_w
                         top = (area.y - oy) / fitted_h * image_h
@@ -351,11 +436,11 @@ class Book:
                     t("“{label}” has no picture yet — the codes will be printed on a blank page.",
                       label=label)
                 )
-            if not [a for a in page.areas if a.sound]:
+            if not [a for a in page.areas if a.sound_id]:
                 problems.append(t("“{label}” has no area with a sound yet.", label=label))
             for area in page.areas:
                 name = area.name or t("Unnamed area")
-                if not area.sound:
+                if not area.sound_id:
                     hints.append(
                         t("“{name}” on “{label}” has no sound and is left out.",
                           name=name, label=label)

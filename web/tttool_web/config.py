@@ -52,6 +52,10 @@ class Config:
     #: ffmpeg is used for the "convert to Tiptoi audio" helper.
     FFMPEG_BIN = os.environ.get("FFMPEG_BIN", "ffmpeg")
 
+    #: Speech synthesizers, in order of preference: pico sounds better.
+    PICO_BIN = os.environ.get("PICO_BIN", "pico2wave")
+    ESPEAK_BIN = os.environ.get("ESPEAK_BIN", "espeak-ng")
+
     #: Interface language. "de" is the default; "en" uses the source strings.
     LANG = os.environ.get("TTTOOL_WEB_LANG", "de").strip().lower() or "de"
 

@@ -109,10 +109,10 @@ Done when: a 12-page book with irregular areas prints correctly at the right
 scale, and a user who prints it wrong is told what went wrong.
 
 
-Milestone 3 — sound without fuss
---------------------------------
+Milestone 3 — sound without fuss ✅
+-----------------------------------
 
-*Target version 1.3*
+*Shipped in 1.3*
 
 * **Record straight into the browser** with a microphone, listen, keep or
   discard, assign to an area.
@@ -124,6 +124,10 @@ Milestone 3 — sound without fuss
   studio file sound equally usable on the pen.
 
 Done when: a book can be made end to end without any audio software.
+
+Status: all of it is in 1.3. Recording needs the page to be served over https
+or from localhost — that is a browser rule, not something the program can lift,
+so the recording tab says so instead of failing silently.
 
 
 Milestone 4 — games without programming

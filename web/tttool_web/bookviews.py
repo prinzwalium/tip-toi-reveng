@@ -5,14 +5,16 @@ authentication and error handling.
 """
 
 import re
+from dataclasses import asdict
+from pathlib import Path
 
 from flask import jsonify, redirect, render_template, request, url_for
 
+from .audio import VOICES, speak, speech_engine, store_sound
 from .book import PAPER_SIZES, Book, store_upload
 from .bookbuild import build, converters_available
 from .i18n import t
-from .projects import Project, ProjectError, list_projects
-from .runner import convert_audio
+from .projects import Project, ProjectError, list_projects, sanitize_filename
 
 #: Strings the editor needs in the browser.
 JS_STRINGS = [
@@ -31,6 +33,17 @@ JS_STRINGS = [
     "Done",
     "Page {number}",
     "Drag on the picture to create an area.",
+    "No sounds yet — record one, let the computer speak, or upload a file.",
+    "Use",
+    "used {count}×",
+    "unused",
+    "Delete this sound?",
+    "This sound is used {count}× — delete it anyway?",
+    "Play",
+    "Delete",
+    "This browser cannot record, or the page is not served over https.",
+    "No microphone available, or permission was refused.",
+    "This installation cannot speak text (no speech synthesizer installed).",
 ]
 
 
@@ -114,13 +127,8 @@ def register_book_routes(app, route, get_project):
             if known is None:
                 continue
             page.image = known.image
-            known_areas = {a.id: a for a in known.areas}
-            for area in page.areas:
-                if area.id in known_areas:
-                    area.sound = known_areas[area.id].sound
-                    area.sound_name = known_areas[area.id].sound_name
-                else:
-                    area.sound = area.sound_name = ""
+            # Sounds are assigned through their own route; from_dict already
+            # dropped any sound_id that is not in the library.
         updated.save(project)
         problems, hints = updated.check()
         return jsonify({"ok": True, "problems": problems, "hints": hints})
@@ -139,50 +147,99 @@ def register_book_routes(app, route, get_project):
         return jsonify({"ok": True, "image": page.image,
                         "url": url_for("raw", name=project.name, path=page.image)})
 
-    @route("/b/<name>/areas/<area_id>/sound", methods=["POST"])
-    def upload_area_sound(name, area_id):
+    # -- the sound library ------------------------------------------------
+
+    def library(project, book) -> dict:
+        usage = book.sound_usage()
+        return {
+            "sounds": [
+                {
+                    **asdict(sound),
+                    "url": url_for("raw", name=project.name, path=sound.file),
+                    "used": usage.get(sound.id, 0),
+                }
+                for sound in book.sounds
+            ],
+            "voices": [{"code": code, "label": label} for code, label in VOICES],
+            "can_speak": bool(speech_engine()),
+        }
+
+    @route("/b/<name>/sounds")
+    def list_sounds(name):
         project, book = get_book_project(name)
-        area = next(
-            (a for page in book.pages for a in page.areas if a.id == area_id), None
-        )
-        if area is None:
-            raise ProjectError(t("This area no longer exists."))
+        return jsonify(library(project, book))
+
+    @route("/b/<name>/sounds/add", methods=["POST"])
+    def add_sound(name):
+        """One entry point for an uploaded file and for a browser recording."""
+        project, book = get_book_project(name)
         upload = request.files.get("sound")
         if not upload or not upload.filename:
             raise ProjectError(t("Please choose a sound file."))
+        source = "record" if request.form.get("source") == "record" else "upload"
+        given = (request.form.get("name") or "").strip()[:120]
+        sound = book.add_sound(
+            name=given or Path(sanitize_filename(upload.filename)).stem,
+            source=source,
+        )
+        sound.file = f"sounds/{sound.id}.ogg"
+        store_sound(project, upload, sound.file)
+        book.save(project)
+        return jsonify({"ok": True, "sound": sound.id, **library(project, book)})
 
-        # Keep the upload aside, convert it to what the pen needs, drop the rest.
-        raw_path, original = store_upload(project, "sounds", f"{area.id}-original", upload)
-        try:
-            result = convert_audio(project, raw_path, f"sounds/{area.id}.ogg")
-        finally:
-            (project.path / raw_path).unlink(missing_ok=True)
-        if not result["ok"]:
-            raise ProjectError(
-                t("This sound file could not be converted. Try MP3, WAV or Ogg.")
-            )
-        area.sound = result["output"]
-        area.sound_name = original
+    @route("/b/<name>/sounds/speak", methods=["POST"])
+    def speak_sound(name):
+        project, book = get_book_project(name)
+        text = (request.form.get("text") or "").strip()
+        language = (request.form.get("language") or "de").strip()
+        sound_id = (request.form.get("sound_id") or "").strip()
+
+        # Speaking again replaces the file of an existing sound, so every area
+        # that uses it follows along.
+        sound = book.sound(sound_id) if sound_id else book.add_sound(source="speak")
+        sound.source = "speak"
+        sound.text = text[:500]
+        sound.language = language
+        sound.name = sound.name or text[:40]
+        sound.file = f"sounds/{sound.id}.ogg"
+        engine = speak(text, language, project.path / sound.file)
         book.save(project)
         return jsonify(
-            {
-                "ok": True,
-                "sound": area.sound,
-                "sound_name": area.sound_name,
-                "url": url_for("raw", name=project.name, path=area.sound),
-            }
+            {"ok": True, "sound": sound.id, "engine": engine, **library(project, book)}
         )
 
-    @route("/b/<name>/areas/<area_id>/sound/delete", methods=["POST"])
-    def delete_area_sound(name, area_id):
+    @route("/b/<name>/sounds/<sound_id>/rename", methods=["POST"])
+    def rename_sound(name, sound_id):
         project, book = get_book_project(name)
+        sound = book.sound(sound_id)
+        sound.name = (request.form.get("name") or "").strip()[:120] or sound.name
+        book.save(project)
+        return jsonify({"ok": True, **library(project, book)})
+
+    @route("/b/<name>/sounds/<sound_id>/delete", methods=["POST"])
+    def delete_sound(name, sound_id):
+        project, book = get_book_project(name)
+        sound = book.sound(sound_id)
+        (project.path / sound.file).unlink(missing_ok=True)
+        book.sounds = [s for s in book.sounds if s.id != sound_id]
         for page in book.pages:
             for area in page.areas:
-                if area.id == area_id and area.sound:
-                    (project.path / area.sound).unlink(missing_ok=True)
-                    area.sound = area.sound_name = ""
+                if area.sound_id == sound_id:
+                    area.sound_id = ""
         book.save(project)
-        return jsonify({"ok": True})
+        return jsonify({"ok": True, "book": book.to_dict(), **library(project, book)})
+
+    @route("/b/<name>/areas/<area_id>/sound", methods=["POST"])
+    def assign_area_sound(name, area_id):
+        """Point an area at a sound of the library, or silence it."""
+        project, book = get_book_project(name)
+        _, area = book.area(area_id)
+        sound_id = (request.form.get("sound_id") or "").strip()
+        if sound_id:
+            book.sound(sound_id)  # raises if it is gone
+        area.sound_id = sound_id
+        book.save(project)
+        return jsonify({"ok": True, "book": book.to_dict(), **library(project, book)})
 
     # -- building ---------------------------------------------------------
 

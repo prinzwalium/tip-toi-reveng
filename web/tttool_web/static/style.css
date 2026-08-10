@@ -259,6 +259,22 @@ button.active { background: var(--accent); color: var(--accent-ink); border-colo
 .book-side .drawer { margin-top: 18px; }
 .book-side h2 { margin-bottom: 10px; }
 .sound-box { border: 1px solid var(--line); border-radius: 8px; padding: 10px; width: 100%; }
+
+/* ---- sound picker ---- */
+
+.sound-picker { width: min(720px, 92vw); }
+.sound-tabs { margin-bottom: 14px; }
+.sound-panel > * + * { margin-top: 10px; }
+.sound-list { max-height: 50vh; overflow: auto; }
+.sound-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 0; border-bottom: 1px solid var(--line);
+}
+.sound-row:last-child { border-bottom: none; }
+.sound-row .sound-name-input { flex: 1; min-width: 8em; }
+.sound-row button { padding: 3px 10px; font-size: 13px; }
+.preview-player { width: 100%; }
+#speak-text { width: 100%; }
 .save-state { font-size: 12px; }
 .save-state.saving { color: var(--warn); }
 .save-state.failed { color: var(--err); }

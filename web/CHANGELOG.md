@@ -7,6 +7,26 @@ YYYY-MM-DD.
 Unreleased
 ----------
 
+1.3.0 — sound without fuss
+--------------------------
+
+Milestone 3 of `ROADMAP.md`. A book can now be made without any audio software
+at all.
+
+* **A sound library per book.** Sounds are no longer stuck to one area: the
+  same “wau” can play on every dog in the book, is renamed in one place, and
+  shows how often it is used before you delete it.
+* **Record with the microphone** straight in the browser: record, listen, keep
+  or discard. (Browsers only allow this over `https://` or on `localhost` —
+  the dialog says so.)
+* **Let the computer speak**: type a sentence, pick a language, and the sound
+  is synthesized with the voice already in the container. Speaking it again
+  replaces the file, so every area that uses it follows along.
+* **Volume levelling** (EBU R128) for everything that comes in, so a phone
+  recording and a studio file are equally usable on the pen's small speaker.
+* Books written by 1.1 and 1.2 are migrated automatically: their sounds move
+  into the library, and areas that shared a file end up sharing one entry.
+
 1.2.0 — books that are actually books
 -------------------------------------
 

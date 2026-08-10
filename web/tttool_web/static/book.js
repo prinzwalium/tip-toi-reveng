@@ -24,6 +24,10 @@
   function say(key) { return T[key] || key; }
   function url(template, value) { return template.replace(/PAGE|AREA|PATH/, encodeURIComponent(value)); }
   function area(id) { return currentPage.areas.filter(function (a) { return a.id === id; })[0]; }
+  function soundOf(a) {
+    if (!a || !a.sound_id) return null;
+    return (book.sounds || []).filter(function (s) { return s.id === a.sound_id; })[0] || null;
+  }
   function selected() { return selectedId ? area(selectedId) : null; }
 
   // ------------------------------------------------------------- saving
@@ -83,7 +87,7 @@
     areasLayer.textContent = "";
     currentPage.areas.forEach(function (a) {
       var g = svg("g", {
-        class: "area" + (a.id === selectedId ? " selected" : "") + (a.sound ? "" : " silent"),
+        class: "area" + (a.id === selectedId ? " selected" : "") + (a.sound_id ? "" : " silent"),
       });
       g.dataset.id = a.id;
 
@@ -143,11 +147,11 @@
     ["x", "y", "w", "h"].forEach(function (key) {
       document.getElementById("area-" + key).value = Math.round(a[key] * 10) / 10;
     });
-    var hasSound = !!a.sound;
-    document.getElementById("sound-play").classList.toggle("hidden", !hasSound);
-    document.getElementById("sound-delete").classList.toggle("hidden", !hasSound);
-    document.getElementById("sound-name").textContent = hasSound
-      ? a.sound_name || a.sound
+    var sound = soundOf(a);
+    document.getElementById("sound-play").classList.toggle("hidden", !sound);
+    document.getElementById("sound-clear").classList.toggle("hidden", !sound);
+    document.getElementById("sound-name").textContent = sound
+      ? sound.name || sound.id
       : say("No sound yet — the area stays silent.");
   }
 
@@ -421,35 +425,48 @@
     this.value = "";
   });
 
-  document.getElementById("area-sound").addEventListener("change", function () {
-    var a = selected();
-    if (!a || !this.files.length) return;
-    var data = new FormData();
-    data.append("sound", this.files[0]);
-    flush().then(function () {
-      post(url(urls.sound, a.id), data, function (result) {
-        a.sound = result.sound;
-        a.sound_name = result.sound_name;
-        render();
-      });
-    });
-    this.value = "";
-  });
-
-  document.getElementById("sound-delete").addEventListener("click", function () {
+  document.getElementById("sound-choose").addEventListener("click", function () {
     var a = selected();
     if (!a) return;
-    post(url(urls.soundDelete, a.id), new FormData(), function () {
-      a.sound = a.sound_name = "";
+    flush().then(function () {
+      window.SoundPicker.open(function (library, soundId) {
+        if (library && library.book) {   // a sound was deleted while picking
+          book.pages = library.book.pages;
+          currentPage = book.pages.filter(function (p) { return p.id === currentPage.id; })[0];
+          book.sounds = library.sounds;
+          render();
+          return;
+        }
+        if (!soundId) return;
+        var data = new FormData();
+        data.append("sound_id", soundId);
+        post(url(urls.soundAssign, a.id), data, function (result) {
+          book.pages = result.book.pages;
+          book.sounds = result.sounds;
+          currentPage = book.pages.filter(function (p) { return p.id === currentPage.id; })[0];
+          render();
+        });
+      });
+    });
+  });
+
+  document.getElementById("sound-clear").addEventListener("click", function () {
+    var a = selected();
+    if (!a) return;
+    var data = new FormData();
+    data.append("sound_id", "");
+    post(url(urls.soundAssign, a.id), data, function (result) {
+      book.pages = result.book.pages;
+      currentPage = book.pages.filter(function (p) { return p.id === currentPage.id; })[0];
       render();
     });
   });
 
   document.getElementById("sound-play").addEventListener("click", function () {
-    var a = selected();
-    if (!a || !a.sound) return;
+    var sound = soundOf(selected());
+    if (!sound) return;
     var player = document.getElementById("sound-player");
-    player.src = url(urls.raw, a.sound);
+    player.src = url(urls.raw, sound.file);
     player.play();
   });
 
