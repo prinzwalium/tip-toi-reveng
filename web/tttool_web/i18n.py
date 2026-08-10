@@ -26,6 +26,29 @@ LANG_COOKIE = "tttool_lang"
 LANGUAGES: tuple[tuple[str, str], ...] = (("de", "Deutsch"), ("en", "English"))
 
 
+#: Strings app.js needs in the browser; the English source is the key.
+#: They live here rather than in app.py so that a test can read them
+#: without importing — and thereby starting — the application.
+UI_STRINGS = [
+    "created",
+    "changed",
+    "deleted",
+    "Files this run wrote that were not there before. Click one to download it.",
+    "Files that already existed and this run overwrote. Click one to download it.",
+    "Files that were removed while this command ran.",
+    "… and {count} more",
+    "in",
+    "ok",
+    "error",
+    "timeout",
+    "exit",
+    "running …",
+    "(no output — that means success)",
+    "(no output)",
+    "Request failed:",
+]
+
+
 def load_catalog(lang: str) -> dict[str, str]:
     path = LOCALES_DIR / f"{lang}.json"
     if not path.is_file():

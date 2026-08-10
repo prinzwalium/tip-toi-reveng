@@ -18,10 +18,16 @@ WEB = Path(__file__).resolve().parents[1]
 PACKAGE = WEB / "tttool_web"
 sys.path.insert(0, str(WEB))
 
-from tttool_web.app import UI_STRINGS  # noqa: E402
+# Nothing here may import tttool_web.app: it builds the application at import
+# time, which wants its data directory to exist.
 from tttool_web.bookviews import JS_STRINGS  # noqa: E402
 from tttool_web.commands import COMMANDS, GROUPS, OID_GLOBAL_PARAMS  # noqa: E402
-from tttool_web.i18n import LANGUAGES, SOURCE_LANG, load_catalog  # noqa: E402
+from tttool_web.i18n import (  # noqa: E402
+    LANGUAGES,
+    SOURCE_LANG,
+    UI_STRINGS,
+    load_catalog,
+)
 
 #: Words that are the same in every language we ship.
 UNTRANSLATED = {"PNG", "PDF", "SVG", "SVG+PNG"}

@@ -26,7 +26,14 @@ from .book import PAPER_SIZES, Book
 from .bookviews import register_book_routes
 from .commands import COMMANDS, GROUPS, OID_GLOBAL_PARAMS, get_command
 from .config import config
-from .i18n import LANG_COOKIE, LANGUAGES, current_lang, known as known_lang, t
+from .i18n import (
+    LANG_COOKIE,
+    LANGUAGES,
+    UI_STRINGS,
+    current_lang,
+    known as known_lang,
+    t,
+)
 from .projects import Project, ProjectError, list_projects
 from .runner import build_invocation, convert_audio, diff_snapshots, run, tttool_version
 
@@ -45,27 +52,6 @@ welcome: hello
 scripts:
   8065: P(hello)
 """
-
-
-#: Strings app.js needs in the browser; the English source is the key.
-UI_STRINGS = [
-    "created",
-    "changed",
-    "deleted",
-    "Files this run wrote that were not there before. Click one to download it.",
-    "Files that already existed and this run overwrote. Click one to download it.",
-    "Files that were removed while this command ran.",
-    "… and {count} more",
-    "in",
-    "ok",
-    "error",
-    "timeout",
-    "exit",
-    "running …",
-    "(no output — that means success)",
-    "(no output)",
-    "Request failed:",
-]
 
 
 def create_app() -> Flask:
