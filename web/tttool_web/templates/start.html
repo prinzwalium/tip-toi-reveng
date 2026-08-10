@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}{{ t("First steps") }}{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <h1>{{ t("Your first book") }}</h1>
+  <p class="muted">
+    {{ t("Four steps from an empty page to a book the pen reads out loud. Nothing here needs any technical knowledge.") }}
+  </p>
+</section>
+
+<section class="card">
+  <h2>{{ t("1. Start a book") }}</h2>
+  <div class="guide">
+    <svg viewBox="0 0 120 80" class="figure" role="img"
+         aria-label="{{ t('Four cards to choose from') }}">
+      <rect x="8" y="18" width="46" height="24" rx="3" class="paper"/>
+      <rect x="66" y="18" width="46" height="24" rx="3" class="paper"/>
+      <rect x="8" y="48" width="46" height="24" rx="3" class="paper"/>
+      <rect x="66" y="48" width="46" height="24" rx="3" class="paper"/>
+      <circle cx="16" cy="26" r="3" class="dot"/>
+      <line x1="24" y1="26" x2="46" y2="26" class="line"/>
+      <line x1="14" y1="34" x2="40" y2="34" class="line"/>
+      <line x1="74" y1="26" x2="96" y2="26" class="line"/>
+      <line x1="14" y1="56" x2="40" y2="56" class="line"/>
+      <line x1="74" y1="56" x2="96" y2="56" class="line"/>
+    </svg>
+    <ol class="steps">
+      <li>{{ t("On the start page, choose what you want to make — a sound book is the easiest.") }}</li>
+      <li>{{ t("Give it a name and pick the paper you will print on. Both can be changed later.") }}</li>
+      <li>{{ t("You land in the editor, with an example page that already talks. Try it out; then replace it with your own.") }}</li>
+    </ol>
+  </div>
+</section>
+
+<section class="card">
+  <h2>{{ t("2. Your picture, your areas") }}</h2>
+  <div class="guide">
+    <svg viewBox="0 0 120 80" class="figure" role="img"
+         aria-label="{{ t('A picture with two areas drawn on it') }}">
+      <rect x="8" y="10" width="104" height="60" rx="3" class="paper"/>
+      <path d="M14 62 l22 -26 l16 18 l14 -16 l30 24 z" class="ink-fill" opacity=".35"/>
+      <circle cx="30" cy="24" r="6" class="ink-fill" opacity=".35"/>
+      <rect x="20" y="30" width="30" height="22" rx="2" class="dot" opacity=".25"/>
+      <rect x="20" y="30" width="30" height="22" rx="2" fill="none" stroke="currentColor" stroke-width="1.2"/>
+      <rect x="64" y="20" width="34" height="20" rx="2" class="dot" opacity=".25"/>
+      <rect x="64" y="20" width="34" height="20" rx="2" fill="none" stroke="currentColor" stroke-width="1.2"/>
+    </svg>
+    <ol class="steps">
+      <li>{{ t("“Choose picture …” uploads a photo or scan of your page. It is fitted onto the paper, never cut off.") }}</li>
+      <li>{{ t("Drag a rectangle onto every thing that should make a sound. For round or odd shapes use “Free shape” and click the corners.") }}</li>
+      <li>{{ t("Areas should be at least the size of a postage stamp — smaller ones are hard for the pen to hit. The editor says so before you print.") }}</li>
+      <li>{{ t("Without a mouse: the tab key jumps from area to area, the arrow keys move the selected one, + and − change its size. Hold shift to go in bigger steps.") }}</li>
+    </ol>
+  </div>
+</section>
+
+<section class="card">
+  <h2>{{ t("3. Give each area a sound") }}</h2>
+  <div class="guide">
+    <svg viewBox="0 0 120 80" class="figure" role="img"
+         aria-label="{{ t('A microphone and sound waves') }}">
+      <rect x="24" y="14" width="16" height="30" rx="8" class="ink-fill"/>
+      <path d="M18 38 a14 14 0 0 0 28 0" fill="none" class="line"/>
+      <line x1="32" y1="52" x2="32" y2="62" class="line"/>
+      <line x1="24" y1="62" x2="40" y2="62" class="line"/>
+      <path d="M62 32 a10 10 0 0 1 0 16" fill="none" class="line"/>
+      <path d="M74 26 a20 20 0 0 1 0 28" fill="none" class="line"/>
+      <path d="M86 20 a30 30 0 0 1 0 40" fill="none" class="line"/>
+      <circle cx="56" cy="40" r="3" class="dot"/>
+    </svg>
+    <ol class="steps">
+      <li>{{ t("Click an area, then “Choose sound …”. A sound can be used by as many areas as you like.") }}</li>
+      <li>{{ t("Record it with the microphone, let the computer speak a sentence, or upload a file — whatever you have.") }}</li>
+      <li>{{ t("An area can do more than play: one of several at random, one after the other, or right and wrong in a quiz. Pick it under “What happens?”.") }}</li>
+      <li>{{ t("An area without a sound stays silent and is left out of the book — the editor marks those.") }}</li>
+    </ol>
+  </div>
+</section>
+
+<section class="card">
+  <h2>{{ t("4. Print it and put it on the pen") }}</h2>
+  <div class="guide">
+    <svg viewBox="0 0 120 80" class="figure" role="img"
+         aria-label="{{ t('A sheet of paper and the pen') }}">
+      <rect x="12" y="10" width="56" height="60" rx="3" class="paper"/>
+      <line x1="20" y1="24" x2="58" y2="24" class="line"/>
+      <line x1="20" y1="34" x2="50" y2="34" class="line"/>
+      <line x1="20" y1="44" x2="54" y2="44" class="line"/>
+      <rect x="94" y="12" width="14" height="56" rx="7" class="ink-fill"/>
+      <circle cx="101" cy="62" r="3" class="dot"/>
+      <path d="M76 40 h10" class="line"/>
+      <path d="M82 36 l6 4 l-6 4 z" class="ink-fill"/>
+    </svg>
+    <ol class="steps">
+      <li>{{ t("“Make book” produces two things: a PDF to print and a file for the pen.") }}</li>
+      <li>{{ t("Print the test page first and check it with a ruler — that one sheet saves a lot of paper.") }}</li>
+      <li>{{ t("Print your page at 100 % on a laser printer, and copy the .gme file onto the pen.") }}</li>
+      <li>
+        {{ t("The details are on their own page:") }}
+        <a href="{{ url_for('pen_page') }}">{{ t("Onto the pen") }}</a>.
+      </li>
+    </ol>
+  </div>
+</section>
+
+<section class="card">
+  <h2>{{ t("Things worth knowing") }}</h2>
+  <dl class="cmdlist">
+    <dt>{{ t("Everything saves itself") }}</dt>
+    <dd>{{ t("There is no save button in the editor. Changes are written as you make them; “Saved” next to the book title tells you so. Ctrl+Z undoes, Ctrl+Shift+Z redoes.") }}</dd>
+
+    <dt>{{ t("A book can have several pages") }}</dt>
+    <dd>{{ t("Add pages with “+ Page”. They all end up in the same file for the pen, and print as one PDF.") }}</dd>
+
+    <dt>{{ t("Passing a book on") }}</dt>
+    <dd>{{ t("“Pass on” packs the whole book — pictures, sounds and all — into one file. Someone else can add it to their own server with “Add book”, and it is your backup too.") }}</dd>
+
+    <dt>{{ t("Nothing here can break the pen") }}</dt>
+    <dd>{{ t("A file the pen does not like is simply not played. Deleting it from the pen is enough to undo anything.") }}</dd>
+  </dl>
+</section>
+{% endblock %}

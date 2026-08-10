@@ -15,6 +15,8 @@
     </p>
   </div>
   <div class="row">
+    <a class="button ghost" href="{{ url_for('export_book_file', name=project.name) }}"
+       data-tip="{{ t('The whole book as one file: pictures, sounds and all. Keep it as a backup, or give it to someone else.') }}">{{ t("Pass on") }}</a>
     <a class="button ghost" href="{{ url_for('project_view', name=project.name) }}"
        data-tip="{{ t('Shows the files behind this book — you do not need this to make a book.') }}">{{ t("Files") }}</a>
     <a class="button ghost" href="{{ url_for('index') }}">{{ t("All books") }}</a>
@@ -66,6 +68,7 @@
 
     <div id="stage" class="stage">
       <svg id="canvas" viewBox="0 0 {{ page_w }} {{ page_h }}" class="page-canvas"
+           role="group" aria-label="{{ t('The page. Every area on it can be reached with the tab key.') }}"
            data-page-w="{{ page_w }}" data-page-h="{{ page_h }}">
         <rect class="page-bg" x="0" y="0" width="{{ page_w }}" height="{{ page_h }}"/>
         <image id="page-picture" x="0" y="0" width="{{ page_w }}" height="{{ page_h }}"
@@ -77,6 +80,9 @@
         </g>
       </svg>
     </div>
+    <p class="muted hint keyboard-hint">
+      {{ t("Without a mouse: the tab key jumps from area to area, the arrow keys move the selected one, + and − change its size. Hold shift to go in bigger steps.") }}
+    </p>
   </section>
 
   <section class="card book-side">

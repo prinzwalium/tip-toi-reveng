@@ -3,21 +3,21 @@
 
 {% macro field(param, file_choices) %}
   {% if param.type == 'bool' %}
-    <label class="check"{% if param.tip %} data-tip="{{ param.tip }}"{% endif %}>
-      <input type="checkbox" name="{{ param.name }}" value="1"> {{ param.label }}
+    <label class="check"{% if param.tip %} data-tip="{{ t(param.tip) }}"{% endif %}>
+      <input type="checkbox" name="{{ param.name }}" value="1"> {{ t(param.label) }}
     </label>
   {% else %}
-    <label class="field"{% if param.tip %} data-tip="{{ param.tip }}"{% endif %}>
-      <span class="label">{{ param.label }}{% if param.required %} <em>*</em>{% endif %}</span>
+    <label class="field"{% if param.tip %} data-tip="{{ t(param.tip) }}"{% endif %}>
+      <span class="label">{{ t(param.label) }}{% if param.required %} <em>*</em>{% endif %}</span>
       {% if param.type == 'file' %}
         {% set grouped = file_choices|by_ext(param.exts) %}
         <select name="{{ param.name }}" {% if param.required %}required{% endif %}>
-          <option value="">— choose a file —</option>
+          <option value="">{{ t("— choose a file —") }}</option>
           {% for choice in grouped.matching %}
             <option value="{{ choice }}">{{ choice }}</option>
           {% endfor %}
           {% if grouped.other %}
-          <optgroup label="other files">
+          <optgroup label="{{ t('other files') }}">
             {% for choice in grouped.other %}
               <option value="{{ choice }}">{{ choice }}</option>
             {% endfor %}
@@ -27,7 +27,7 @@
       {% elif param.type == 'choice' %}
         <select name="{{ param.name }}">
           {% for value, label in param.choices %}
-            <option value="{{ value }}" {% if value == param.default %}selected{% endif %}>{{ label }}</option>
+            <option value="{{ value }}" {% if value == param.default %}selected{% endif %}>{{ t(label) }}</option>
           {% endfor %}
         </select>
       {% elif param.type == 'int' %}
@@ -39,7 +39,7 @@
                placeholder="{{ param.placeholder }}" autocomplete="off"
                {% if param.required %}required{% endif %}>
       {% endif %}
-      {% if param.help %}<span class="hint muted">{{ param.help }}</span>{% endif %}
+      {% if param.help %}<span class="hint muted">{{ t(param.help) }}</span>{% endif %}
     </label>
   {% endif %}
 {% endmacro %}
@@ -48,61 +48,60 @@
 <section class="hero project-head">
   <div>
     <h1>{{ project.name }}</h1>
-    <p class="muted">{{ files|selectattr('is_dir', 'equalto', false)|list|length }} files ·
+    <p class="muted">{{ files|selectattr('is_dir', 'equalto', false)|list|length }} {{ t("files") }} ·
       <a href="{{ url_for('archive', name=project.name) }}"
-         data-tip="Download the whole project as one zip — sources, audio and everything tttool produced.">download as .zip</a></p>
+         data-tip="{{ t('Download the whole project as one zip — sources, audio and everything tttool produced.') }}">{{ t("download as .zip") }}</a></p>
   </div>
   <a class="button ghost" href="{{ url_for('index') }}"
-     data-tip="Back to the list of projects.">← all projects</a>
+     data-tip="{{ t('Back to the list of projects.') }}">← {{ t("all projects") }}</a>
 </section>
 
 <div class="columns">
   <section class="card col-files">
-    <h2><span data-tip="Everything in this project's directory on the server — what you uploaded and what tttool produced.">Files</span></h2>
+    <h2><span data-tip="{{ t('Everything in this project\'s directory on the server — what you uploaded and what tttool produced.') }}">{{ t("Files") }}</span></h2>
     <div id="file-list">
       {% include "_files.html" %}
     </div>
 
     <details class="drawer" open>
-      <summary data-tip="Put your own YAML sources, audio samples or an existing GME file into this project.">Upload files</summary>
+      <summary data-tip="{{ t('Put your own YAML sources, audio samples or an existing GME file into this project.') }}">{{ t("Upload files") }}</summary>
       <form method="post" action="{{ url_for('upload', name=project.name) }}"
             enctype="multipart/form-data" class="stack">
         <input type="file" name="files" multiple required
-               data-tip="Several files at once are fine.">
+               data-tip="{{ t('Several files at once are fine.') }}">
         <label class="field"
-               data-tip="Leave empty to put the files straight into the project. Give a name such as “audio” to collect them in a directory — that is what media-path in the YAML file refers to.">
-          <span class="label">Sub directory (optional)</span>
+               data-tip="{{ t('Leave empty to put the files straight into the project. Give a name such as “audio” to collect them in a directory — that is what media-path in the YAML file refers to.') }}">
+          <span class="label">{{ t("Sub directory (optional)") }}</span>
           <input type="text" name="subdir" placeholder="audio" autocomplete="off">
         </label>
-        <button type="submit">Upload</button>
+        <button type="submit">{{ t("Upload") }}</button>
         <p class="hint muted">
-          Audio for the pen must be mono Ogg Vorbis at 22050 Hz — upload anything and use
-          the “→ Ogg” button to convert it with ffmpeg.
+          {{ t("Audio for the pen must be mono Ogg Vorbis at 22050 Hz — upload anything and use the “→ Ogg” button to convert it with ffmpeg.") }}
         </p>
       </form>
     </details>
 
     <details class="drawer">
-      <summary data-tip="Start a file from scratch in the browser editor instead of uploading one.">New file</summary>
+      <summary data-tip="{{ t('Start a file from scratch in the browser editor instead of uploading one.') }}">{{ t("New file") }}</summary>
       <form method="post" action="{{ url_for('new_file', name=project.name) }}" class="row">
         <input type="text" name="path" placeholder="book.yaml" required autocomplete="off"
-               data-tip="Name of the new file. Without an extension it becomes a .yaml file, prefilled with a small example book.">
+               data-tip="{{ t('Name of the new file. Without an extension it becomes a .yaml file, prefilled with a small example book.') }}">
         <button type="submit"
-                data-tip="Create the file and open it in the editor.">Create &amp; edit</button>
+                data-tip="{{ t('Create the file and open it in the editor.') }}">{{ t("Create & edit") }}</button>
       </form>
     </details>
   </section>
 
   <section class="card col-run">
-    <h2><span data-tip="Pick a command, fill in the form, press Run. It executes on the server in this project's directory.">Run tttool</span></h2>
+    <h2><span data-tip="{{ t('Pick a command, fill in the form, press Run. It executes on the server in this project\'s directory.') }}">{{ t("Run tttool") }}</span></h2>
     <div class="cmdbar">
       {% for group in groups %}
         <div class="cmdgroup">
-          <span class="grouplabel muted">{{ group }}</span>
+          <span class="grouplabel muted">{{ t(group) }}</span>
           {% for c in commands if c.group == group %}
             <button type="button" class="tab{% if c.id == selected %} active{% endif %}"
                     data-cmd="{{ c.id }}"
-                    data-tip="{{ c.description }}">{{ c.label }}</button>
+                    data-tip="{{ t(c.description) }}">{{ c.label }}</button>
           {% endfor %}
         </div>
       {% endfor %}
@@ -113,8 +112,8 @@
           method="post" action="{{ url_for('run_command', name=project.name) }}"
           {% if c.derive_out %}data-derive="{{ c.derive_out|join(':') }}"{% endif %}>
       <input type="hidden" name="command" value="{{ c.id }}">
-      <p class="cmddesc">{{ c.description }}</p>
-      {% if c.note %}<p class="note">{{ c.note }}</p>{% endif %}
+      <p class="cmddesc">{{ t(c.description) }}</p>
+      {% if c.note %}<p class="note">{{ t(c.note) }}</p>{% endif %}
       <div class="fields">
         {% for param in c.params %}
           {{ field(param, file_choices) }}
@@ -122,20 +121,20 @@
       </div>
       {% if c.oid_options %}
       <details class="drawer">
-        <summary data-tip="How the dot patterns are drawn: resolution, dot size, physical size and file format. The defaults are what works on a laser printer.">OID drawing options</summary>
+        <summary data-tip="{{ t('How the dot patterns are drawn: resolution, dot size, physical size and file format. The defaults are what works on a laser printer.') }}">{{ t("OID drawing options") }}</summary>
         <div class="fields">
           {% for param in oid_params %}
             {{ field(param, file_choices) }}
           {% endfor %}
         </div>
         <p class="hint muted">
-          Printing needs a laser printer at 1200 dpi; check the handbook before changing these.
+          {{ t("Printing needs a laser printer at 1200 dpi; check the handbook before changing these.") }}
         </p>
       </details>
       {% endif %}
       <div class="row">
         <button type="submit"
-                data-tip="Run “tttool {{ c.label }}” in this project's directory on the server.">Run {{ c.label }}</button>
+                data-tip="{{ t('Run “tttool {command}” in this project\'s directory on the server.', command=c.label) }}">{{ t("Run {command}", command=c.label) }}</button>
       </div>
     </form>
     {% endfor %}
@@ -143,13 +142,13 @@
     <div id="output" class="output hidden">
       <div class="outhead">
         <code id="out-command"
-              data-tip="The exact command line that ran. You can reproduce it in a shell inside the project directory."></code>
+              data-tip="{{ t('The exact command line that ran. You can reproduce it in a shell inside the project directory.') }}"></code>
         <span id="out-status" class="badge"
-              data-tip="How the run ended and how long it took. Anything other than “ok” means tttool reported an error below."></span>
+              data-tip="{{ t('How the run ended and how long it took. Anything other than “ok” means tttool reported an error below.') }}"></span>
         <button type="button" class="ghost" id="out-download"
-                data-tip="Save this output as a text file.">Save output</button>
+                data-tip="{{ t('Save this output as a text file.') }}">{{ t("Save output") }}</button>
         <button type="button" class="ghost" id="out-close"
-                aria-label="Close the output" data-tip="Hide this output.">×</button>
+                aria-label="{{ t('Close the output') }}" data-tip="{{ t('Hide this output.') }}">×</button>
       </div>
       <pre id="out-text"></pre>
       <div id="out-files" class="outfiles"></div>
@@ -162,7 +161,7 @@
     <div class="row modal-head">
       <strong id="preview-name"></strong>
       <button type="button" class="ghost" id="preview-close"
-              aria-label="Close the preview" data-tip="Close the preview (Esc).">×</button>
+              aria-label="{{ t('Close the preview') }}" data-tip="{{ t('Close the preview (Esc).') }}">×</button>
     </div>
     <div id="preview-body"></div>
   </div>

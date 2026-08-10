@@ -183,20 +183,23 @@ program next to a pen. Everything up to the PDF is checked automatically —
 paper size, physical scale, dot pitch — but the last centimetre is unverified.
 
 
-Milestone 6 — sharing and finish
---------------------------------
+Milestone 6 — sharing and finish ✅
+-----------------------------------
 
-*Target version 1.6*
+*Shipped in 1.6 · a book stops being stuck on the server that made it*
 
-* **Export and import a whole book** as one file (pictures, sounds, areas and
-  all), so books can be shared, backed up and moved between servers.
-* **German interface**, switchable — the Tiptoi community is largely
-  German-speaking, and the handbook is in German. (Worth pulling earlier if the
-  first testers prefer German; the work is the same, only the timing differs.)
-* Accessibility pass: keyboard operation of the editor, contrast, screen
-  reader labels.
-* Illustrated getting-started documentation that matches the finished
-  interface.
+* **Export and import a whole book** as one `.tiptoi` file (pictures, sounds,
+  areas and the code assignment), so books can be shared, backed up and moved
+  between servers — and a page printed before the move still works after it.
+* **German interface**, switchable per visitor. Complete this time: the command
+  panel for advanced users is translated too, and a test fails if any string in
+  the interface has no German counterpart.
+* Accessibility pass: the whole editor is operable from the keyboard (tab
+  between areas, arrows to move, `+`/`−` to resize), every area carries a
+  spoken label, every page starts with a skip link, and the colours meet
+  WCAG AA.
+* Illustrated getting-started documentation at `/hilfe/erste-schritte`, written
+  against the interface as it now is.
 
 Done when: a book made on one server can be opened and printed on another, and
 the interface is usable in German and by keyboard.

@@ -85,11 +85,27 @@
 
   function isPolygon(a) { return a.kind === "poly" && a.points && a.points.length >= 3; }
 
+  function describe(a) {
+    var sound = soundOf(a);
+    return say("Area {name}, {x} by {y} millimetres, {sound}")
+      .replace("{name}", a.name || say("Area"))
+      .replace("{x}", Math.round(a.x))
+      .replace("{y}", Math.round(a.y))
+      .replace("{sound}", sound
+        ? say("plays {sound}").replace("{sound}", sound.name || sound.id)
+        : say("no sound yet"));
+  }
+
   function render() {
     areasLayer.textContent = "";
     currentPage.areas.forEach(function (a) {
       var g = svg("g", {
         class: "area" + (a.id === selectedId ? " selected" : "") + (a.sound_id ? "" : " silent"),
+        // Reachable and describable without a mouse: Tab walks the areas of
+        // the page, and the label says which one and what it does.
+        tabindex: "0",
+        role: "button",
+        "aria-label": describe(a),
       });
       g.dataset.id = a.id;
 
@@ -392,6 +408,27 @@
   });
 
   function clamp(value, low, high) { return Math.max(low, Math.min(value, high)); }
+
+  function moveArea(a, x, y) {
+    var nx = clamp(x, 0, pageW - a.w);
+    var ny = clamp(y, 0, pageH - a.h);
+    if (isPolygon(a)) {
+      var dx = nx - a.x, dy = ny - a.y;
+      a.points = a.points.map(function (p) { return [round1(p[0] + dx), round1(p[1] + dy)]; });
+    }
+    a.x = nx;
+    a.y = ny;
+    round(a);
+  }
+
+  function resizeArea(a, w, h) {
+    // A free shape has no width and height of its own — its corners are its
+    // shape, and those are moved one by one.
+    if (isPolygon(a)) return;
+    a.w = clamp(w, 3, pageW - a.x);
+    a.h = clamp(h, 3, pageH - a.y);
+    round(a);
+  }
   function round1(value) { return Math.round(value * 10) / 10; }
   function round(a) {
     ["x", "y", "w", "h"].forEach(function (k) { a[k] = round1(a[k]); });
@@ -582,6 +619,82 @@
   });
 
   document.getElementById("undo").addEventListener("click", undo);
+
+  // -- the editor without a mouse ---------------------------------------
+  //
+  // Tab reaches every area, Enter/Space selects it, the arrow keys move it
+  // and + / − change its size. Everything else on the page is ordinary form
+  // controls, which the browser already handles.
+
+  var ARROWS = {
+    ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1],
+  };
+
+  function focusedArea() {
+    var node = document.activeElement;
+    while (node && node !== areasLayer) {
+      if (node.dataset && node.dataset.id) return area(node.dataset.id);
+      node = node.parentNode;
+    }
+    return null;
+  }
+
+  function keepFocus(id) {
+    var node = areasLayer.querySelector('[data-id="' + id + '"]');
+    if (node && node.focus) node.focus();
+  }
+
+  //: Nudging with the keyboard should end up as one undo step, not thirty.
+  var nudging = null;
+  function nudge(a, move) {
+    if (nudging !== a.id) {
+      snapshot();
+      nudging = a.id;
+      window.setTimeout(function () { nudging = null; }, 1500);
+    }
+    move();
+    change();
+    keepFocus(a.id);
+  }
+
+  function selectArea(id) {
+    selectedId = id;
+    render();  // renders the side panel too
+    keepFocus(id);
+  }
+
+  areasLayer.addEventListener("focusin", function (event) {
+    var node = event.target;
+    if (node.dataset && node.dataset.id && node.dataset.id !== selectedId) {
+      selectArea(node.dataset.id);
+    }
+  });
+
+  areasLayer.addEventListener("keydown", function (event) {
+    var a = focusedArea();
+    if (!a) return;
+
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      selectArea(a.id);
+      return;
+    }
+
+    var step = ARROWS[event.key];
+    if (step) {
+      event.preventDefault();
+      var distance = event.shiftKey ? 5 : 1;
+      nudge(a, function () { moveArea(a, a.x + step[0] * distance, a.y + step[1] * distance); });
+      return;
+    }
+
+    if (event.key === "+" || event.key === "-") {
+      event.preventDefault();
+      var by = (event.key === "+" ? 1 : -1) * (event.shiftKey ? 5 : 1);
+      nudge(a, function () { resizeArea(a, a.w + by, a.h + by); });
+    }
+  });
+
   document.addEventListener("keydown", function (event) {
     if (drawing && event.key === "Enter") { event.preventDefault(); finishDrawing(); return; }
     if (drawing && event.key === "Escape") {

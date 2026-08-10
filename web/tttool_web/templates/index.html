@@ -7,6 +7,7 @@
   <p class="muted">
     {{ t("Make a book: upload a picture, draw areas on it, give each area a sound. You get a sheet to print and a file for the pen.") }}
   </p>
+  <p><a href="{{ url_for('start_page') }}">{{ t("How it works, step by step →") }}</a></p>
 </section>
 
 <section class="card">
@@ -78,8 +79,8 @@
         <td class="muted">{{ p.mtime }}</td>
         <td class="right nowrap">
           <a class="button ghost" href="{{ url_for('edit_book', name=p.name) }}">{{ t("Open") }}</a>
-          <a class="button ghost" href="{{ url_for('archive', name=p.name) }}"
-             data-tip="{{ t('Download everything as one zip — that is the whole backup.') }}">{{ t("Backup") }}</a>
+          <a class="button ghost" href="{{ url_for('export_book_file', name=p.name) }}"
+             data-tip="{{ t('The whole book as one file: pictures, sounds and all. Keep it as a backup, or give it to someone else.') }}">{{ t("Pass on") }}</a>
           {% if allow_delete %}
           <form method="post" action="{{ url_for('delete_project', name=p.name) }}" class="inline"
                 data-confirm="{{ t('Delete “{name}” and everything in it?', name=p.name) }}">
@@ -94,6 +95,15 @@
   {% else %}
   <p class="muted empty">{{ t("No books yet — make your first one above.") }}</p>
   {% endif %}
+
+  <form method="post" action="{{ url_for('import_book_file') }}" enctype="multipart/form-data"
+        class="row import-row">
+    <span class="muted hint">{{ t("Got a book from someone else?") }}</span>
+    <input type="file" name="book" accept=".tiptoi,.zip" required
+           aria-label="{{ t('Exported book file') }}">
+    <button type="submit" class="ghost"
+            data-tip="{{ t('Adds the book to this server. Your own books stay untouched.') }}">{{ t("Add book") }}</button>
+  </form>
 </section>
 
 <details class="card drawer-card">
@@ -129,7 +139,8 @@
         <td class="muted">{{ p.size }}</td>
         <td class="muted">{{ p.mtime }}</td>
         <td class="right nowrap">
-          <a class="button ghost" href="{{ url_for('archive', name=p.name) }}">{{ t("Backup") }}</a>
+          <a class="button ghost" href="{{ url_for('archive', name=p.name) }}"
+             data-tip="{{ t('Download everything as one zip — that is the whole backup.') }}">{{ t("Backup") }}</a>
           {% if allow_delete %}
           <form method="post" action="{{ url_for('delete_project', name=p.name) }}" class="inline"
                 data-confirm="{{ t('Delete “{name}” and everything in it?', name=p.name) }}">

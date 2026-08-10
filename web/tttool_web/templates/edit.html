@@ -5,9 +5,9 @@
 <section class="hero project-head">
   <div>
     <h1>{{ relpath }}</h1>
-    <p class="muted">in project <a href="{{ url_for('project_view', name=project.name) }}">{{ project.name }}</a></p>
+    <p class="muted">{{ t("in project") }} <a href="{{ url_for('project_view', name=project.name) }}">{{ project.name }}</a></p>
   </div>
-  <a class="button ghost" href="{{ url_for('project_view', name=project.name) }}">← back</a>
+  <a class="button ghost" href="{{ url_for('project_view', name=project.name) }}">← {{ t("back") }}</a>
 </section>
 
 <section class="card">
@@ -16,10 +16,10 @@
     <textarea name="content" id="editor" spellcheck="false" wrap="off">{{ content }}</textarea>
     <div class="row">
       <button type="submit"
-              data-tip="Write the file and go back to the project.">Save &amp; close</button>
+              data-tip="{{ t('Write the file and go back to the project.') }}">{{ t("Save & close") }}</button>
       <button type="submit" name="stay" value="1" class="ghost"
-              data-tip="Write the file and keep editing (Ctrl+S).">Save</button>
-      <span class="hint muted">Tab inserts two spaces — YAML does not like tab characters.</span>
+              data-tip="{{ t('Write the file and keep editing (Ctrl+S).') }}">{{ t("Save") }}</button>
+      <span class="hint muted">{{ t("Tab inserts two spaces — YAML does not like tab characters.") }}</span>
     </div>
   </form>
 </section>

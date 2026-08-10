@@ -5,7 +5,7 @@
   --ink: #1c2024;
   --muted: #667080;
   --line: #dfe3e8;
-  --accent: #1f6feb;
+  --accent: #1b66dd;   /* 4.9:1 on the page background — WCAG AA for text */
   --accent-ink: #ffffff;
   --ok: #1a7f37;
   --err: #b42318;
@@ -68,7 +68,37 @@ code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
 .brand { font-weight: 700; font-size: 17px; color: var(--ink); display: flex; align-items: center; gap: 8px; }
 .brand .dot { width: 11px; height: 11px; border-radius: 50%; background: var(--accent); }
 .topbar nav { display: flex; gap: 16px; }
-.topbar .version { margin-left: auto; font-size: 12px; }
+.topbar .version { font-size: 12px; }
+.topbar .langswitch { margin-left: auto; display: flex; align-items: center; gap: 4px; font-size: 12px; }
+.topbar .langswitch button {
+  background: none; border: 1px solid var(--line); color: var(--muted);
+  padding: 2px 7px; font-size: 12px; font-weight: 700; border-radius: 6px;
+}
+.topbar .langswitch button:hover { color: var(--ink); border-color: var(--muted); }
+.topbar .langswitch .current {
+  padding: 2px 7px; font-weight: 700; color: var(--ink);
+  border: 1px solid transparent;
+}
+
+/* Visible only once it has the keyboard focus — the first stop on every page. */
+.skip-link {
+  position: absolute; left: 8px; top: -60px; z-index: 50;
+  background: var(--panel); color: var(--ink);
+  border: 1px solid var(--accent); border-radius: 6px;
+  padding: 8px 14px; font-weight: 600;
+  transition: top .1s;
+}
+.skip-link:focus { top: 8px; }
+
+/* Every interactive element gets the same ring, including the SVG areas. */
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.page-canvas .area:focus { outline: none; }
+.page-canvas .area:focus-visible rect,
+.page-canvas .area:focus-visible polygon { stroke-width: 1.2; stroke-dasharray: none; }
+.page-canvas .area:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+.keyboard-hint { margin: 8px 2px 0; font-size: 12px; }
+.import-row { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.import-row input[type=file] { flex: 0 1 320px; font-size: 13px; }
 
 main { max-width: 1400px; margin: 0 auto; padding: 20px; }
 footer { max-width: 1400px; margin: 0 auto; padding: 10px 20px 40px; font-size: 12px; }
@@ -170,7 +200,8 @@ table.list tr:hover td { background: var(--bg); }
 
 .cmdbar { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
 .cmdgroup { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.grouplabel { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; width: 70px; flex: none; }
+.grouplabel { font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
+  width: 96px; flex: none; padding-right: 6px; }   /* fits the longest label in either language */
 .tab {
   background: transparent; color: var(--ink); border: 1px solid var(--line);
   padding: 3px 10px; font-size: 13px; border-radius: 999px;
@@ -318,7 +349,7 @@ button.active { background: var(--accent); color: var(--accent-ink); border-colo
 .figure .paper { fill: var(--panel); stroke: var(--muted); stroke-width: 1.5; }
 .figure .line { stroke: var(--muted); stroke-width: 2; }
 .figure .dot { fill: var(--accent); }
-.steps { margin: 0; padding-left: 20px; font-size: 14px; }
+.steps { margin: 0; padding-left: 20px; font-size: 14px; flex: 1 1 320px; }
 .steps li { margin: 6px 0; }
 
 /* ---- tooltips ---- */

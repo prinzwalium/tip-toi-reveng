@@ -4,18 +4,25 @@ Registered from :func:`tttool_web.app.create_app` so that they share its
 authentication and error handling.
 """
 
-import re
+import tempfile
 from dataclasses import asdict
 from pathlib import Path
 
-from flask import jsonify, redirect, render_template, request, url_for
+from flask import flash, jsonify, redirect, render_template, request, send_file, url_for
 
 from .audio import VOICES, speak, speech_engine, store_sound
 from .book import GROUP_KINDS, PAPER_SIZES, Book, store_upload
 from .bookbuild import build, converters_available
 from .starters import STARTERS, apply_starter
 from .i18n import t
-from .projects import Project, ProjectError, list_projects, sanitize_filename
+from .projects import (
+    Project,
+    ProjectError,
+    list_projects,
+    sanitize_filename,
+    unique_name,
+)
+from .transfer import export_book, export_name, import_book
 
 #: Strings the editor needs in the browser.
 JS_STRINGS = [
@@ -53,12 +60,10 @@ JS_STRINGS = [
     "Reward when everything is found",
     "none",
     "Choose",
+    "Area {name}, {x} by {y} millimetres, {sound}",
+    "plays {sound}",
+    "no sound yet",
 ]
-
-
-def _slug(title: str) -> str:
-    slug = re.sub(r"[^A-Za-z0-9]+", "-", title).strip("-").lower()
-    return slug[:48] or "buch"
 
 
 def register_book_routes(app, route, get_project):
@@ -76,12 +81,7 @@ def register_book_routes(app, route, get_project):
         paper = request.form.get("paper") if request.form.get("paper") in PAPER_SIZES else None
 
         taken = {p["name"] for p in list_projects()}
-        base = _slug(title)
-        name, suffix = base, 2
-        while name in taken:
-            name, suffix = f"{base}-{suffix}", suffix + 1
-
-        project = Project(name).create()
+        project = Project(unique_name(title)).create()
         book = Book(title=title, paper=paper or Book().paper)
         book.product_id = _free_product_id(taken)
         book.add_page("Seite 1")
@@ -106,6 +106,32 @@ def register_book_routes(app, route, get_project):
             if candidate not in used:
                 return candidate
         return 42
+
+    # -- taking a book elsewhere ------------------------------------------
+
+    @route("/b/<name>/export")
+    def export_book_file(name):
+        """The whole book — model, pictures, sounds, codes — as one file."""
+        project, book = get_book_project(name)
+        # Spooled: a book with a few sounds stays in memory, a big one does not.
+        buffer = tempfile.SpooledTemporaryFile(max_size=32 * 1024 * 1024)
+        export_book(project, book, buffer)
+        buffer.seek(0)
+        return send_file(
+            buffer,
+            mimetype="application/zip",
+            as_attachment=True,
+            download_name=export_name(project),
+        )
+
+    @route("/books/import", methods=["POST"])
+    def import_book_file():
+        upload = request.files.get("book")
+        if not upload or not upload.filename:
+            raise ProjectError(t("Please choose an exported book."))
+        project = import_book(upload, (request.form.get("title") or "").strip()[:80])
+        flash(t("Imported “{title}”.", title=Book.load(project).title), "success")
+        return redirect(url_for("edit_book", name=project.name))
 
     # -- the editor -------------------------------------------------------
 

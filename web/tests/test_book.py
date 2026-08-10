@@ -837,3 +837,157 @@ def test_the_pen_page_explains_the_way_to_the_pen(client):
     assert "100%" in page
     assert "tiptoi" in page
     assert "50 mm" in page
+
+
+# -- passing a book on ------------------------------------------------------
+
+
+def export(client, name):
+    response = client.get(f"/b/{name}/export")
+    assert response.status_code == 200
+    return response.data
+
+
+def import_archive(client, blob, filename="buch.tiptoi"):
+    return client.post(
+        "/books/import",
+        data={"book": (io.BytesIO(blob), filename)},
+        content_type="multipart/form-data",
+    )
+
+
+def test_an_exported_book_can_be_imported_again(client):
+    pytest.importorskip("PIL")
+    response = client.post("/books", data={"title": "Bauernhof", "starter": "example"})
+    name = response.headers["Location"].rstrip("/").split("/")[-1]
+    original = client.get(f"/b/{name}/data").get_json()
+
+    imported = import_archive(client, export(client, name))
+    assert imported.status_code == 302
+    copy_name = imported.headers["Location"].rstrip("/").split("/")[-1]
+    assert copy_name != name
+
+    copy = client.get(f"/b/{copy_name}/data").get_json()
+    assert copy["title"] == original["title"]
+    assert copy["paper"] == original["paper"]
+    assert len(copy["sounds"]) == len(original["sounds"])
+    assert [a["name"] for a in copy["pages"][0]["areas"]] == [
+        a["name"] for a in original["pages"][0]["areas"]
+    ]
+    # every picture and sound came across, and every area still plays one
+    for sound in copy["sounds"]:
+        assert (client.data_dir / copy_name / sound["file"]).is_file()
+    assert (client.data_dir / copy_name / copy["pages"][0]["image"]).is_file()
+    assert all(a["sound_id"] for a in copy["pages"][0]["areas"])
+
+    # and the imported book builds, which is the only thing that really counts
+    assert client.post(f"/b/{copy_name}/build").get_json()["ok"]
+
+
+def test_an_imported_book_keeps_the_codes_of_the_original(client):
+    """A page printed before the export has to keep working afterwards."""
+    name = make_book(client, "Codes")
+    book = client.get(f"/b/{name}/data").get_json()
+    book["pages"][0]["areas"] = [{"id": "a1", "name": "Hund", "x": 10, "y": 10, "w": 30, "h": 30}]
+    client.put(f"/b/{name}/data", json=book)
+    add_sound(client, name, "a1")
+    original = client.post(f"/b/{name}/build").get_json()
+
+    copy_name = (
+        import_archive(client, export(client, name))
+        .headers["Location"]
+        .rstrip("/")
+        .split("/")[-1]
+    )
+    assert (client.data_dir / copy_name / "book.codes.yaml").is_file()
+    assert client.post(f"/b/{copy_name}/build").get_json()["codes"] == original["codes"]
+
+
+def test_import_rejects_anything_that_is_not_a_book(client):
+    import zipfile
+
+    plain = io.BytesIO()
+    with zipfile.ZipFile(plain, "w") as archive:
+        archive.writestr("holiday.jpg", b"not a book")
+    assert import_archive(client, plain.getvalue()).status_code == 302
+    assert list(client.data_dir.iterdir()) == []
+
+    assert import_archive(client, b"this is not a zip at all").status_code == 302
+    assert import_archive(client, b"x", filename="virus.exe").status_code == 302
+    assert list(client.data_dir.iterdir()) == []
+
+
+def test_import_cannot_write_outside_its_own_book(client):
+    """File names in the archive are hostile input; ours are the ones used."""
+    import zipfile
+
+    payload = io.BytesIO()
+    with zipfile.ZipFile(payload, "w") as archive:
+        archive.writestr(
+            "tiptoi-buch.json",
+            json.dumps(
+                {
+                    "format": "tttool-web-book",
+                    "version": 1,
+                    "book": {
+                        "title": "Böse",
+                        "pages": [{"id": "s1", "image": "../../../escape.png", "areas": []}],
+                        "sounds": [{"id": "t1", "file": "../../../escape.ogg"}],
+                    },
+                }
+            ),
+        )
+        archive.writestr("../../../escape.png", b"PNG")
+        archive.writestr("../../../escape.ogg", b"OGG")
+
+    response = import_archive(client, payload.getvalue())
+    assert response.status_code == 302
+    name = response.headers["Location"].rstrip("/").split("/")[-1]
+    assert not (client.data_dir.parent / "escape.png").exists()
+    assert not (client.data_dir / "escape.ogg").exists()
+
+    # The contents still arrive — under the names *we* pick, inside the book.
+    book = client.get(f"/b/{name}/data").get_json()
+    assert book["pages"][0]["image"] == "seiten/s1.png"
+    assert [s["file"] for s in book["sounds"]] == ["sounds/t1.ogg"]
+    written = {
+        p.relative_to(client.data_dir).as_posix()
+        for p in client.data_dir.rglob("*")
+        if p.is_file()
+    }
+    assert all(path.startswith(f"{name}/") for path in written), written
+
+
+# -- language ---------------------------------------------------------------
+
+
+def test_the_interface_language_can_be_switched(client):
+    assert "Your Tiptoi books" in client.get("/").data.decode()
+
+    client.post("/language", data={"lang": "de"})
+    assert "Deine Tiptoi-Bücher" in client.get("/").data.decode()
+
+    client.post("/language", data={"lang": "en"})
+    assert "Your Tiptoi books" in client.get("/").data.decode()
+
+
+def test_an_unknown_language_is_refused(client):
+    client.post("/language", data={"lang": "../../etc"})
+    assert "Your Tiptoi books" in client.get("/").data.decode()
+
+
+def test_the_first_steps_page_walks_through_all_four_steps(client):
+    page = client.get("/hilfe/erste-schritte").data.decode()
+    for heading in ("1. Start a book", "2. Your picture, your areas", "3. Give each area a sound"):
+        assert heading in page
+    # and it points at the page that covers the last step in detail
+    assert "/hilfe/stift" in page
+
+
+def test_every_page_offers_the_language_switch_and_a_skip_link(client):
+    name = make_book(client)
+    for path in ("/", f"/b/{name}", "/hilfe/erste-schritte", "/hilfe/stift", "/help"):
+        page = client.get(path).data.decode()
+        assert 'href="#main"' in page, path
+        assert 'action="/language"' in page, path
+        assert 'id="main"' in page, path

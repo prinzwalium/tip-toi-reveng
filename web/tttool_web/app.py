@@ -26,7 +26,7 @@ from .book import PAPER_SIZES, Book
 from .bookviews import register_book_routes
 from .commands import COMMANDS, GROUPS, OID_GLOBAL_PARAMS, get_command
 from .config import config
-from .i18n import t
+from .i18n import LANG_COOKIE, LANGUAGES, current_lang, known as known_lang, t
 from .projects import Project, ProjectError, list_projects
 from .runner import build_invocation, convert_audio, diff_snapshots, run, tttool_version
 
@@ -45,6 +45,27 @@ welcome: hello
 scripts:
   8065: P(hello)
 """
+
+
+#: Strings app.js needs in the browser; the English source is the key.
+UI_STRINGS = [
+    "created",
+    "changed",
+    "deleted",
+    "Files this run wrote that were not there before. Click one to download it.",
+    "Files that already existed and this run overwrote. Click one to download it.",
+    "Files that were removed while this command ran.",
+    "… and {count} more",
+    "in",
+    "ok",
+    "error",
+    "timeout",
+    "exit",
+    "running …",
+    "(no output — that means success)",
+    "(no output)",
+    "Request failed:",
+]
 
 
 def create_app() -> Flask:
@@ -175,8 +196,24 @@ def create_app() -> Flask:
             "app_build": config.build,
             "tttool_version": app.config.setdefault("TTTOOL_VERSION", tttool_version()),
             "allow_delete": config.ALLOW_DELETE,
-            "lang": config.LANG,
+            "lang": current_lang(),
+            "languages": LANGUAGES,
+            "ui_strings": {key: t(key) for key in UI_STRINGS},
         }
+
+    @route("/language", methods=["POST"])
+    def set_language():
+        """Remember the visitor's language; the default stays the configured one."""
+        lang = (request.form.get("lang") or "").strip().lower()
+        if not known_lang(lang):
+            raise ProjectError("Unknown language")
+        response = redirect(back())
+        # A year: long enough that nobody has to pick twice, short enough that
+        # a shared browser forgets eventually.
+        response.set_cookie(
+            LANG_COOKIE, lang, max_age=365 * 24 * 3600, samesite="Lax", httponly=False
+        )
+        return response
 
     # -- projects ---------------------------------------------------------
 
@@ -358,6 +395,11 @@ def create_app() -> Flask:
     @route("/help")
     def help_page():
         return render_template("help.html", commands=COMMANDS, groups=GROUPS)
+
+    @route("/hilfe/erste-schritte")
+    def start_page():
+        """The illustrated walk through making a first book."""
+        return render_template("start.html")
 
     @route("/hilfe/stift")
     def pen_page():

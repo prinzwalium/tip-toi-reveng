@@ -2,7 +2,8 @@ tttool web GUI
 ==============
 
 Make your own Tiptoi books in the browser, on your own server. The interface is
-German by default (`TTTOOL_WEB_LANG=en` switches to English).
+German by default and switchable per visitor with the DE/EN buttons in the
+header; `TTTOOL_WEB_LANG=en` changes what everyone sees first.
 
 **Making a book** — the part that needs no technical knowledge:
 
@@ -21,9 +22,19 @@ German by default (`TTTOOL_WEB_LANG=en` switches to English).
  5. *Buch erstellen* → a test page for your printer, a PDF to print, and a
     `.gme` file to copy onto the pen.
 
-A strip above the editor shows which of those steps you are on, and
-*Auf den Stift* in the menu (`/hilfe/stift`) walks through printing and copying
-with pictures — including what to check when the pen stays silent.
+A strip above the editor shows which of those steps you are on.
+*Erste Schritte* in the menu (`/hilfe/erste-schritte`) walks through the whole
+thing with pictures, and *Auf den Stift* (`/hilfe/stift`) covers printing and
+copying — including what to check when the pen stays silent.
+
+The editor needs no mouse: the tab key walks the areas of a page, the arrow
+keys move the selected one, `+` and `−` resize it, and shift makes the steps
+bigger. Every area carries a label for screen readers.
+
+**Passing a book on.** *Weitergeben* saves a whole book — pictures, sounds,
+areas and the code assignment — as a single `.tiptoi` file. *Buch hinzufügen*
+on any other server unpacks it into a book there, keeping the codes, so a page
+printed before the move still works after it. The same file is your backup.
 
 Recording needs the page to be served over `https://` or opened on
 `localhost` — browsers do not allow microphone access otherwise.

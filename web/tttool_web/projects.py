@@ -42,6 +42,22 @@ def sanitize_filename(name: str) -> str:
     return name[:120]
 
 
+def slug(title: str, fallback: str = "buch") -> str:
+    """A project directory name derived from a title the user typed."""
+    slugged = re.sub(r"[^A-Za-z0-9]+", "-", title or "").strip("-").lower()
+    return slugged[:48] or fallback
+
+
+def unique_name(title: str) -> str:
+    """A slug of ``title`` that no project uses yet."""
+    taken = {entry["name"] for entry in list_projects()}
+    base = slug(title)
+    name, suffix = base, 2
+    while name in taken:
+        name, suffix = f"{base}-{suffix}", suffix + 1
+    return name
+
+
 def sanitize_relpath(relpath: str) -> str:
     """Sanitize a user supplied *relative* path (may contain sub directories)."""
     relpath = (relpath or "").replace("\\", "/")

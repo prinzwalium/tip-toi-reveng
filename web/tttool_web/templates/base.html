@@ -8,13 +8,16 @@
   <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
 </head>
 <body>
+<a class="skip-link" href="#main">{{ t("Skip to the content") }}</a>
 <header class="topbar">
   <a class="brand" href="{{ url_for('index') }}">
     <span class="dot"></span> tttool <span class="muted">web</span>
   </a>
-  <nav>
+  <nav aria-label="{{ t('Main navigation') }}">
     <a href="{{ url_for('index') }}"
        data-tip="{{ t('All your books, and the advanced projects.') }}">{{ t("Books") }}</a>
+    <a href="{{ url_for('start_page') }}"
+       data-tip="{{ t('How to make a book, step by step and with pictures.') }}">{{ t("First steps") }}</a>
     <a href="{{ url_for('pen_page') }}"
        data-tip="{{ t('Printing, copying onto the pen, and what to do when it stays silent.') }}">{{ t("Onto the pen") }}</a>
     <a href="{{ url_for('help_page') }}"
@@ -22,14 +25,26 @@
     <a href="https://tttool.readthedocs.io/de/latest/" target="_blank" rel="noopener"
        data-tip="{{ t('Das tttool-Handbuch: the full documentation of the YAML format (in German). Opens in a new tab.') }}">Handbuch</a>
   </nav>
+  <form class="langswitch" method="post" action="{{ url_for('set_language') }}"
+        aria-label="{{ t('Interface language') }}">
+    {% for code, label in languages %}
+      {% if code == lang %}
+        <span class="current" aria-current="true">{{ code|upper }}</span>
+      {% else %}
+        <button type="submit" name="lang" value="{{ code }}"
+                data-tip="{{ t('Show the interface in this language.') }}"
+                title="{{ label }}">{{ code|upper }}</button>
+      {% endif %}
+    {% endfor %}
+  </form>
   <span class="version muted"
-        data-tip="Version of the tttool binary inside this container. Every command below is run by it.">tttool {{ tttool_version }}</span>
+        data-tip="{{ t('Version of the tttool binary inside this container. Every command below is run by it.') }}">tttool {{ tttool_version }}</span>
 </header>
 
-<main>
+<main id="main">
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
-      <ul class="flashes">
+      <ul class="flashes" role="status" aria-live="polite">
         {% for category, message in messages %}
           <li class="flash {{ category }}">{{ message }}</li>
         {% endfor %}
@@ -46,6 +61,7 @@
   {% endif %} — {{ t("a browser front end for") }}
   <a href="https://github.com/entropia/tip-toi-reveng" target="_blank" rel="noopener">tip-toi-reveng</a>.
 </footer>
+<script id="ui-strings" type="application/json">{{ ui_strings | tojson }}</script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -7,6 +7,36 @@ YYYY-MM-DD.
 Unreleased
 ----------
 
+1.6.0 — sharing and finish
+--------------------------
+
+Milestone 6 of `ROADMAP.md`. Up to now a book lived on the server that made it,
+in a language chosen by whoever started the container, and needed a mouse. All
+three are fixed.
+
+* **Pass a book on.** *Weitergeben* packs a whole book — the model, the page
+  pictures, the sounds and the code assignment — into one `.tiptoi` file;
+  *Buch hinzufügen* unpacks it into a new book on any other server. The codes
+  come along, so a page printed before the export still works with the
+  re-imported book. It doubles as the backup: one file, everything in it.
+  Nothing from the archive is written to a path that came out of the archive —
+  file names are rebuilt from the book, so a hand-crafted archive cannot reach
+  outside its own project.
+* **The language is now the visitor's choice**, DE/EN in the header, remembered
+  in a cookie; `TTTOOL_WEB_LANG` still sets what everyone sees first. The
+  German is complete this time — the tttool command panel, the file list and
+  the browser-side strings were the last English corners, and a test now walks
+  every translatable string and fails on a missing one (and on a leftover, and
+  on a dropped `{placeholder}`).
+* **The editor works without a mouse.** Tab reaches every area, Enter selects
+  it, the arrow keys move it and `+`/`−` resize it — with shift for bigger
+  steps, and a whole burst of nudges collapsing into one undo step. Each area
+  carries a label a screen reader can read out ("Feld Hund, 32 zu 88
+  Millimeter, spielt Hund"), every page starts with a skip link, and the accent
+  colour was darkened to reach WCAG AA on the page background.
+* **Erste Schritte**, an illustrated walk through making a first book, at
+  `/hilfe/erste-schritte` and linked from the start screen.
+
 1.5.0 — the guided path
 -----------------------
 

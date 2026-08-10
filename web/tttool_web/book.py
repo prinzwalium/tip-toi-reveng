@@ -390,7 +390,7 @@ class Book:
         delete them.
         """
         if not isinstance(data, dict):
-            raise ProjectError("The book file is damaged")
+            raise ProjectError(t("The book file is damaged"))
         book = cls(
             title=str(data.get("title") or "Mein Buch")[:80],
             product_id=int(data.get("product_id") or 42),
@@ -521,11 +521,11 @@ class Book:
     def load(cls, project: Project) -> "Book":
         path = project.path / BOOK_FILE
         if not path.is_file():
-            raise ProjectError("This project is not a book")
+            raise ProjectError(t("This project is not a book"))
         try:
             return cls.from_dict(json.loads(path.read_text(encoding="utf-8")))
         except json.JSONDecodeError as exc:
-            raise ProjectError(f"The book file is damaged: {exc}") from None
+            raise ProjectError(t("The book file is damaged: {error}", error=exc)) from None
 
     def save(self, project: Project) -> None:
         path = project.path / BOOK_FILE

@@ -2,6 +2,14 @@
 
 // ---------------------------------------------------------------- helpers
 
+// Interface strings, translated on the server and handed over as JSON. The
+// English source doubles as the key, so an untranslated string still reads.
+var UI_STRINGS = (function () {
+  var node = document.getElementById("ui-strings");
+  try { return node ? JSON.parse(node.textContent) : {}; } catch (e) { return {}; }
+})();
+function say(key) { return UI_STRINGS[key] || key; }
+
 function $(selector, root) { return (root || document).querySelector(selector); }
 function $$(selector, root) { return Array.from((root || document).querySelectorAll(selector)); }
 
@@ -157,11 +165,11 @@ if (out) {
       var wrap = document.createElement("div");
       var tag = document.createElement("span");
       tag.className = "tag";
-      tag.textContent = list.length + " " + kind;
+      tag.textContent = list.length + " " + say({ created: "created", changed: "changed", deleted: "deleted" }[kind]);
       tag.setAttribute("data-tip", {
-        created: "Files this run wrote that were not there before. Click one to download it.",
-        changed: "Files that already existed and this run overwrote. Click one to download it.",
-        deleted: "Files that were removed while this command ran.",
+        created: say("Files this run wrote that were not there before. Click one to download it."),
+        changed: say("Files that already existed and this run overwrote. Click one to download it."),
+        deleted: say("Files that were removed while this command ran."),
       }[kind]);
       wrap.appendChild(tag);
       var ul = document.createElement("ul");
@@ -180,7 +188,7 @@ if (out) {
       if (list.length > 200) {
         var li = document.createElement("li");
         li.className = "muted";
-        li.textContent = "… and " + (list.length - 200) + " more";
+        li.textContent = say("… and {count} more").replace("{count}", list.length - 200);
         ul.appendChild(li);
       }
       wrap.appendChild(ul);
@@ -189,12 +197,12 @@ if (out) {
   }
 
   function showResult(result) {
-    outCommand.textContent = result.command + (result.cwd && result.cwd !== "." ? "   (in " + result.cwd + "/)" : "");
+    outCommand.textContent = result.command + (result.cwd && result.cwd !== "." ? "   (" + say("in") + " " + result.cwd + "/)" : "");
     var duration = result.duration ? " · " + result.duration.toFixed(1) + "s" : "";
     if (result.ok) {
-      setStatus("ok" + duration, "ok");
+      setStatus(say("ok") + duration, "ok");
     } else {
-      setStatus((result.exit_code === null ? "timeout" : "exit " + result.exit_code) + duration, "err");
+      setStatus((result.exit_code === null ? say("timeout") : say("exit") + " " + result.exit_code) + duration, "err");
     }
     outText.textContent = "";
     if (result.stdout) outText.appendChild(document.createTextNode(result.stdout));
@@ -205,14 +213,14 @@ if (out) {
       outText.appendChild(span);
     }
     if (!result.stdout && !result.stderr) {
-      outText.textContent = result.ok ? "(no output — that means success)" : "(no output)";
+      outText.textContent = result.ok ? say("(no output — that means success)") : say("(no output)");
     }
     renderFiles(result.files);
     refreshFiles();
   }
 
   function showError(message) {
-    setStatus("error", "err");
+    setStatus(say("error"), "err");
     outText.textContent = message;
     outFiles.innerHTML = "";
   }
@@ -232,7 +240,7 @@ if (out) {
     outCommand.textContent = "";
     outFiles.innerHTML = "";
     outText.textContent = "";
-    setStatus("running…", "busy");
+    setStatus(say("running …"), "busy");
     fetch(form.action, {
       method: "POST",
       body: formData || new FormData(form),
@@ -244,7 +252,7 @@ if (out) {
           showResult(data);
         });
       })
-      .catch(function (err) { showError("Request failed: " + err); });
+      .catch(function (err) { showError(say("Request failed:") + " " + err); });
   }
 
   $$(".cmdform").forEach(function (form) {
