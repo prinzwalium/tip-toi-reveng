@@ -22,8 +22,11 @@ from flask import (
 )
 
 from . import __version__
+from .book import PAPER_SIZES, Book
+from .bookviews import register_book_routes
 from .commands import COMMANDS, GROUPS, OID_GLOBAL_PARAMS, get_command
 from .config import config
+from .i18n import t
 from .projects import Project, ProjectError, list_projects
 from .runner import build_invocation, convert_audio, diff_snapshots, run, tttool_version
 
@@ -88,7 +91,16 @@ def create_app() -> Flask:
             abort(404, str(exc))
 
     #: Endpoints that always answer with JSON, errors included.
-    JSON_ENDPOINTS = {"run_command", "convert", "healthz"}
+    JSON_ENDPOINTS = {
+        "run_command",
+        "convert",
+        "healthz",
+        "book_data",
+        "upload_page_image",
+        "upload_area_sound",
+        "delete_area_sound",
+        "build_book",
+    }
 
     def wants_json() -> bool:
         return (
@@ -142,6 +154,8 @@ def create_app() -> Flask:
         other = [c for c in choices if not c.lower().endswith(exts)]
         return {"matching": matching, "other": other[:OTHER_FILES_LIMIT]}
 
+    app.jinja_env.globals["t"] = t
+
     @app.context_processor
     def template_globals():
         return {
@@ -149,6 +163,7 @@ def create_app() -> Flask:
             "app_build": config.build,
             "tttool_version": app.config.setdefault("TTTOOL_VERSION", tttool_version()),
             "allow_delete": config.ALLOW_DELETE,
+            "lang": config.LANG,
         }
 
     # -- projects ---------------------------------------------------------
@@ -158,8 +173,19 @@ def create_app() -> Flask:
 
     @route("/")
     def index():
+        projects = list_projects()
+        for entry in projects:
+            try:
+                entry["is_book"] = Book.is_book(Project(entry["name"]))
+            except ProjectError:
+                entry["is_book"] = False
         return render_template(
-            "index.html", projects=list_projects(), examples=config.examples_available
+            "index.html",
+            projects=projects,
+            books=[p for p in projects if p["is_book"]],
+            others=[p for p in projects if not p["is_book"]],
+            examples=config.examples_available,
+            papers=PAPER_SIZES,
         )
 
     @route("/projects", methods=["POST"])
@@ -331,6 +357,8 @@ def create_app() -> Flask:
                 "build": {"ref": config.BUILD_REF, "commit": config.BUILD_SHA},
             }
         )
+
+    register_book_routes(app, route, get_project)
 
     return app
 

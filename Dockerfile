@@ -91,6 +91,8 @@ ENV LANG=C.UTF-8 \
 # ffmpeg converts uploaded audio, vorbis-tools (oggenc) and a speech synthesizer
 # are what tttool needs for its text-to-speech feature.  SVOX pico sounds much
 # better than espeak but lives in Debian's non-free component, so it is optional.
+# libcairo2 and the DejaVu fonts are what the book editor renders its printable
+# pages with.
 RUN set -eux; \
     printf '%s\n' \
         'Types: deb' \
@@ -104,6 +106,8 @@ RUN set -eux; \
         ca-certificates \
         espeak-ng \
         ffmpeg \
+        fonts-dejavu-core \
+        libcairo2 \
         libgmp10 \
         libnuma1 \
         libtinfo6 \

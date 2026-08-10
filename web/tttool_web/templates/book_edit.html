@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}{{ book.title }}{% endblock %}
+
+{% block content %}
+{% set page_w, page_h = page_size %}
+{% set px, py, pw, ph = power_field %}
+
+<section class="hero project-head">
+  <div>
+    <h1>{{ book.title }}</h1>
+    <p class="muted">
+      {{ t("Book number {id}", id=book.product_id) }} ·
+      {{ t("{count} page(s)", count=book.pages|length) }} ·
+      <span id="save-state" class="save-state">{{ t("Saved") }}</span>
+    </p>
+  </div>
+  <div class="row">
+    <a class="button ghost" href="{{ url_for('project_view', name=project.name) }}"
+       data-tip="{{ t('Shows the files behind this book — you do not need this to make a book.') }}">{{ t("Files") }}</a>
+    <a class="button ghost" href="{{ url_for('index') }}">{{ t("All books") }}</a>
+  </div>
+</section>
+
+<div class="book-layout">
+  <section class="card book-canvas-card">
+    <div class="row book-toolbar">
+      <strong>{{ t("Page") }}</strong>
+      <select id="page-picker">
+        {% for page in book.pages %}
+          <option value="{{ page.id }}">{{ page.name or page.id }}</option>
+        {% endfor %}
+      </select>
+
+      <label class="button ghost file-button"
+             data-tip="{{ t('A photo or scan of the page you want to make tappable.') }}">
+        {{ t("Choose picture …") }}
+        <input type="file" id="page-image" accept="image/*" hidden>
+      </label>
+
+      <button type="button" id="add-area" class="ghost"
+              data-tip="{{ t('Then drag a rectangle onto the picture.') }}">+ {{ t("Area") }}</button>
+      <button type="button" id="undo" class="ghost" data-tip="{{ t('Undo the last change (Ctrl+Z).') }}">↶</button>
+      <span class="grow"></span>
+      <span class="muted hint">{{ t("Drag on the picture to create an area.") }}</span>
+    </div>
+
+    <div id="stage" class="stage">
+      <svg id="canvas" viewBox="0 0 {{ page_w }} {{ page_h }}" class="page-canvas"
+           data-page-w="{{ page_w }}" data-page-h="{{ page_h }}">
+        <rect class="page-bg" x="0" y="0" width="{{ page_w }}" height="{{ page_h }}"/>
+        <image id="page-picture" x="0" y="0" width="{{ page_w }}" height="{{ page_h }}"
+               preserveAspectRatio="xMidYMid meet"/>
+        <g id="areas"></g>
+        <g class="power-field" data-tip="{{ t('The power-on field. Without it the pen does not know the book.') }}">
+          <rect x="{{ px }}" y="{{ py }}" width="{{ pw }}" height="{{ ph }}"/>
+          <text x="{{ px + pw / 2 }}" y="{{ py + ph / 2 }}" text-anchor="middle">{{ t("ON") }}</text>
+        </g>
+      </svg>
+    </div>
+  </section>
+
+  <section class="card book-side">
+    <h2>{{ t("Selected area") }}</h2>
+    <div id="area-empty" class="muted empty">{{ t("Click an area, or drag a new one onto the picture.") }}</div>
+
+    <div id="area-form" class="stack hidden">
+      <label class="field">
+        <span class="label">{{ t("Name") }}</span>
+        <input type="text" id="area-name" autocomplete="off" placeholder="{{ t('Dog') }}">
+      </label>
+
+      <div class="fields">
+        <label class="field"><span class="label">{{ t("Left (mm)") }}</span>
+          <input type="number" id="area-x" step="1" min="0"></label>
+        <label class="field"><span class="label">{{ t("Top (mm)") }}</span>
+          <input type="number" id="area-y" step="1" min="0"></label>
+        <label class="field"><span class="label">{{ t("Width (mm)") }}</span>
+          <input type="number" id="area-w" step="1" min="1"></label>
+        <label class="field"><span class="label">{{ t("Height (mm)") }}</span>
+          <input type="number" id="area-h" step="1" min="1"></label>
+      </div>
+
+      <div class="sound-box">
+        <div class="row">
+          <label class="button ghost file-button">
+            {{ t("Choose sound …") }}
+            <input type="file" id="area-sound" accept="audio/*" hidden>
+          </label>
+          <button type="button" id="sound-play" class="ghost hidden">▶ {{ t("Play") }}</button>
+          <button type="button" id="sound-delete" class="ghost danger hidden">×</button>
+        </div>
+        <p id="sound-name" class="muted hint">{{ t("No sound yet — the area stays silent.") }}</p>
+        <audio id="sound-player" hidden></audio>
+      </div>
+
+      <button type="button" id="area-delete" class="ghost danger">{{ t("Delete area") }}</button>
+    </div>
+
+    <div class="drawer">
+      <h2>{{ t("Finish") }}</h2>
+      <p class="muted hint">
+        {{ t("Makes two files: one to print, and one to copy onto the pen.") }}
+      </p>
+      <button type="button" id="build" {% if not can_print %}disabled{% endif %}>
+        {{ t("Make book") }}
+      </button>
+      {% if not can_print %}
+        <p class="note">{{ t("This installation cannot create PDFs. Please update the container image.") }}</p>
+      {% endif %}
+      <div id="build-result" class="build-result hidden"></div>
+    </div>
+  </section>
+</div>
+
+<script id="book-data" type="application/json">{{ book.to_dict() | tojson }}</script>
+<script id="book-strings" type="application/json">{{ js_strings | tojson }}</script>
+<div id="book-urls"
+     data-save="{{ url_for('book_data', name=project.name) }}"
+     data-image="{{ url_for('upload_page_image', name=project.name, page_id='PAGE') }}"
+     data-sound="{{ url_for('upload_area_sound', name=project.name, area_id='AREA') }}"
+     data-sound-delete="{{ url_for('delete_area_sound', name=project.name, area_id='AREA') }}"
+     data-build="{{ url_for('build_book', name=project.name) }}"
+     data-raw="{{ url_for('raw', name=project.name, path='PATH') }}"
+     hidden></div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+<script src="{{ url_for('static', filename='book.js') }}"></script>
+{% endblock %}

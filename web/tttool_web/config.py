@@ -52,6 +52,9 @@ class Config:
     #: ffmpeg is used for the "convert to Tiptoi audio" helper.
     FFMPEG_BIN = os.environ.get("FFMPEG_BIN", "ffmpeg")
 
+    #: Interface language. "de" is the default; "en" uses the source strings.
+    LANG = os.environ.get("TTTOOL_WEB_LANG", "de").strip().lower() or "de"
+
     #: Files copied into a project created with "start from the example book".
     EXAMPLES_DIR = Path(os.environ.get("TTTOOL_WEB_EXAMPLES", "/app/examples"))
 

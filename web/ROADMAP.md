@@ -52,10 +52,10 @@ GIMP at 1200 dpi, generate one PNG per code, place them as layers, do not scale
 them, print without fitting to page”. That is the step we are replacing.
 
 
-Milestone 1 — the book editor, first usable version
----------------------------------------------------
+Milestone 1 — the book editor, first usable version ✅
+------------------------------------------------------
 
-*Target version 1.1 · the smallest thing that produces a real book*
+*Shipped in 1.1 · the smallest thing that produces a real book*
 
 Goal: upload one picture, paint rectangles on it, drop a sound on each, get a
 printable PDF and a file for the pen — without leaving the browser.
@@ -79,6 +79,11 @@ Ships:
 Done when: someone who has never used a command line uploads a drawing, paints
 four areas, gives them four sounds, prints the PDF on a laser printer and hears
 the right sound for each area — guided only by the screen.
+
+Status: everything above is in 1.1, and the interface is German. What is still
+open is the last half of that sentence — the printed page has been verified on
+screen and in CI (true size, patterns inside the painted areas), but not yet
+with a real printer and a real pen. That is the first thing to try on the beta.
 
 
 Milestone 2 — books that are actually books

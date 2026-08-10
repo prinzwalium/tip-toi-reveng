@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ lang }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -14,11 +14,11 @@
   </a>
   <nav>
     <a href="{{ url_for('index') }}"
-       data-tip="All your projects — one directory per book on the server.">Projects</a>
+       data-tip="{{ t('All your books, and the advanced projects.') }}">{{ t("Books") }}</a>
     <a href="{{ url_for('help_page') }}"
-       data-tip="What every command in this GUI does, and what it maps to on the command line.">Commands</a>
+       data-tip="{{ t('What every command in this GUI does, and what it maps to on the command line.') }}">{{ t("Commands") }}</a>
     <a href="https://tttool.readthedocs.io/de/latest/" target="_blank" rel="noopener"
-       data-tip="Das tttool-Handbuch: the full documentation of the YAML format (in German). Opens in a new tab.">Handbuch</a>
+       data-tip="{{ t('Das tttool-Handbuch: the full documentation of the YAML format (in German). Opens in a new tab.') }}">Handbuch</a>
   </nav>
   <span class="version muted"
         data-tip="Version of the tttool binary inside this container. Every command below is run by it.">tttool {{ tttool_version }}</span>
@@ -40,8 +40,8 @@
 
 <footer class="muted">
   tttool web {{ app_version }}{% if app_build %}
-    <span data-tip="The image this container was built from. Please mention it when reporting a problem with a beta build.">· {{ app_build }}</span>
-  {% endif %} — a browser front end for
+    <span data-tip="{{ t('The image this container was built from. Please mention it when reporting a problem with a beta build.') }}">· {{ app_build }}</span>
+  {% endif %} — {{ t("a browser front end for") }}
   <a href="https://github.com/entropia/tip-toi-reveng" target="_blank" rel="noopener">tip-toi-reveng</a>.
 </footer>
 {% block scripts %}{% endblock %}

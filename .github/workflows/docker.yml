@@ -166,6 +166,36 @@ jobs:
           grep -q '"commit": *"[0-9a-f]\{7\}"' /tmp/health.json
           echo "::endgroup::"
 
+          # Make a book the way the editor does: create it, put an area with a
+          # sound on the page, press "make book".
+          echo "::group::book editor"
+          curl -fsS -o /dev/null -X POST http://127.0.0.1:8080/books \
+            --data 'title=CI Buch&paper=a4-landscape'
+          curl -fsS -o /dev/null -X PUT http://127.0.0.1:8080/b/ci-buch/data \
+            -H 'Content-Type: application/json' \
+            -d '{"title":"CI Buch","product_id":42,"paper":"a4-landscape","pages":[{"id":"s1","name":"Seite 1","image":"","areas":[{"id":"a1","name":"Hund","x":20,"y":20,"w":40,"h":30}]}]}'
+          docker cp tttool-web:/app/examples/example/hello.ogg /tmp/hello.ogg
+          curl -fsS -o /dev/null -X POST -F sound=@/tmp/hello.ogg \
+            http://127.0.0.1:8080/b/ci-buch/areas/a1/sound
+          result=$(curl -fsS -X POST http://127.0.0.1:8080/b/ci-buch/build)
+          echo "$result"
+          echo "$result" | grep -q '"ok":true'
+          curl -fsS -o book.pdf 'http://127.0.0.1:8080/p/ci-buch/download?path=druck/ci-buch.pdf'
+          # A page that is not exactly A4 landscape would print at the wrong
+          # scale, and the codes would be unreadable — fail loudly instead.
+          python3 - <<'PY'
+          import re
+          data = open("book.pdf", "rb").read()
+          box = re.search(rb"/MediaBox\s*\[([^\]]*)\]", data)
+          assert box, "no MediaBox in the PDF"
+          numbers = [float(n) for n in box.group(1).split()]
+          w, h = numbers[2] / 72 * 25.4, numbers[3] / 72 * 25.4
+          print(f"page: {w:.1f} x {h:.1f} mm")
+          assert abs(w - 297) < 1 and abs(h - 210) < 1, "wrong page size"
+          PY
+          docker exec tttool-web tttool info /data/ci-buch/buch.gme | grep -i 'product id'
+          echo "::endgroup::"
+
       - name: Log in to ghcr.io
         if: github.event_name == 'push' || inputs.push
         uses: docker/login-action@v3

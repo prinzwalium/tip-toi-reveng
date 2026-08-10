@@ -60,6 +60,8 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("TTTOOL_BIN", str(stub))
     monkeypatch.setenv("FFMPEG_BIN", str(ffmpeg))
     monkeypatch.setenv("TTTOOL_WEB_EXAMPLES", str(examples))
+    # These tests assert on the source strings, not on a translation.
+    monkeypatch.setenv("TTTOOL_WEB_LANG", "en")
     for module in [m for m in list(sys.modules) if m.startswith("tttool_web")]:
         del sys.modules[module]
 
@@ -82,7 +84,7 @@ def make_project(client, name="book", **form):
 def test_index_empty(client):
     response = client.get("/")
     assert response.status_code == 200
-    assert b"No projects yet" in response.data
+    assert b"No books yet" in response.data
 
 
 def test_create_project_with_template(client):

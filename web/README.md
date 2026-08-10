@@ -1,8 +1,23 @@
 tttool web GUI
 ==============
 
-A small browser front end for [`tttool`](https://github.com/entropia/tip-toi-reveng),
-meant to be run as a container on your own server. It gives you
+Make your own Tiptoi books in the browser, on your own server. The interface is
+German by default (`TTTOOL_WEB_LANG=en` switches to English).
+
+**Making a book** — the part that needs no technical knowledge:
+
+ 1. *Neues Buch*, give it a name, pick the paper size.
+ 2. Upload a picture of the page.
+ 3. Drag rectangles onto it, one per thing that should make a sound, and give
+    each one a sound file.
+ 4. *Buch erstellen* → a PDF to print and a `.gme` file to copy onto the pen.
+
+Print the PDF **at 100%** (never “fit to page”) on a laser printer, check the
+printed 50 mm mark with a ruler, tap the power-on field, and the pen reads your
+book. What is still missing is on the [roadmap](ROADMAP.md).
+
+Under the book editor sits a full front end for
+[`tttool`](https://github.com/entropia/tip-toi-reveng), for anyone who wants it:
 
  * **projects** — one directory per book, with upload, in-browser YAML editing,
    download of single files and of the whole project as a zip,
