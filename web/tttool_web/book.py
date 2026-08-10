@@ -157,7 +157,11 @@ class Page:
     id: str
     name: str = ""
     #: Path of the page picture inside the project, empty while none is set.
+    #: This is always the original: it is what gets printed.
     image: str = ""
+    #: A smaller copy for the editor. Derived from ``image``, so it may be
+    #: regenerated or missing, in which case the editor shows the original.
+    preview: str = ""
     areas: list[Area] = field(default_factory=list)
 
     def area(self, area_id: str) -> Area:
@@ -354,7 +358,8 @@ class Book:
 
     def duplicate_page(self, page: Page) -> Page:
         copy = Page(id=_next_id("s", {p.id for p in self.pages}),
-                    name=f"{page.name or page.id} (2)", image=page.image)
+                    name=f"{page.name or page.id} (2)", image=page.image,
+                    preview=page.preview)
         taken = {a.id for p in self.pages for a in p.areas}
         for area in page.areas:
             # The sound comes along: one sound of the library can play in as
@@ -406,6 +411,7 @@ class Book:
                 id=str(raw_page.get("id") or ""),
                 name=str(raw_page.get("name") or "")[:80],
                 image=str(raw_page.get("image") or ""),
+                preview=str(raw_page.get("preview") or ""),
             )
             if not ID_RE.match(page.id):
                 page.id = _next_id("s", {p.id for p in book.pages})
@@ -474,9 +480,12 @@ class Book:
                 path, name = legacy[area.id]
                 existing = next((s for s in book.sounds if s.file == path), None)
                 if existing is None:
+                    # The old field held the uploaded file name; the library
+                    # shows names, so "wau.mp3" becomes "wau".
+                    label = Path(name).stem if name else Path(path).stem
                     existing = Sound(
                         id=_next_id("t", {s.id for s in book.sounds}),
-                        name=name or Path(path).stem,
+                        name=label,
                         file=path,
                     )
                     book.sounds.append(existing)

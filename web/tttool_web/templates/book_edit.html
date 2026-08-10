@@ -10,7 +10,7 @@
     <h1>{{ book.title }}</h1>
     <p class="muted">
       {{ t("Book number {id}", id=book.product_id) }} ·
-      {{ t("{count} page(s)", count=book.pages|length) }} ·
+      {{ plural("one page", "{count} pages", book.pages|length) }} ·
       <span id="save-state" class="save-state">{{ t("Saved") }}</span>
     </p>
   </div>

@@ -7,6 +7,38 @@ YYYY-MM-DD.
 Unreleased
 ----------
 
+2.0.0 — the finished product
+----------------------------
+
+Milestone 7 of `ROADMAP.md`, and the point of the whole exercise: a program you
+can hand to somebody who will never read this file. Nothing here is a new thing
+a book can do — it is what a tool needs before it can be recommended.
+
+* **Big pictures no longer cost what they used to.** An ordinary A4 scan at
+  300 dpi is 3508 × 2480 pixels, twelve megabytes as a PNG. It used to be sent
+  to the browser in full on every page, and embedded in the PDF as raw pixels.
+  Now the editor gets a small copy of its own, and the picture goes into the
+  PDF as JPEG at print resolution. Measured on one such page: the editor
+  downloads **12 MB → 0.5 MB**, and the printed PDF is **18 MB → 1.9 MB** at
+  unchanged resolution. The original is never modified — it is still what gets
+  printed from.
+  Only the artwork is compressed. The dots the pen reads are vector patterns
+  and are provably untouched: the code re-encodes exactly the one image whose
+  size it embedded, and a test checks the patterns are still there afterwards.
+* **Back up everything, restore everything.** *Alles sichern* packs every book
+  on the server into one file; adding that file back restores all of them.
+  Inside it is simply one `.tiptoi` per book, so a single book can be pulled
+  out of a backup with any unzip program.
+* **Books made by earlier versions keep working**, and there is now a test that
+  says so: a `book.json` in the 1.1 shape — no sound library, no behaviours, no
+  groups — opens, gets a library, and builds. A migrated sound is named "wau"
+  now rather than "wau.mp3".
+* **The project stops accumulating rubbish.** Deleting a page deletes its
+  picture (unless a duplicated page still uses it), and a book that loses a
+  page no longer keeps offering the printed page that went with it.
+* Proper plurals: "1 Seite(n)" was software talking. It says *eine Seite* and
+  *3 Seiten* now, in both languages.
+
 1.6.0 — sharing and finish
 --------------------------
 

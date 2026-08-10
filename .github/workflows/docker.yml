@@ -226,6 +226,16 @@ jobs:
           test "$original" = "$imported" || { echo "codes changed: $original != $imported"; exit 1; }
           echo "::endgroup::"
 
+          # And the same for the whole server: back everything up, put it back.
+          curl -fsS -o sicherung.tiptoi http://127.0.0.1:8080/books/backup
+          python3 -c "import zipfile,sys; z=zipfile.ZipFile('sicherung.tiptoi'); n=z.namelist(); \
+            print(n); sys.exit(0 if 'tiptoi-sicherung.json' in n else 1)"
+          curl -fsS -o /dev/null -X POST http://127.0.0.1:8080/books/import \
+            -F 'book=@sicherung.tiptoi;filename=sicherung.tiptoi'
+          restored=$(curl -fsS -X POST http://127.0.0.1:8080/b/ci-buch-3/build)
+          echo "$restored" | grep -q '"ok":true'
+          echo "::endgroup::"
+
           # The interface is German by default and switches on request.
           echo "::group::language"
           curl -fsS http://127.0.0.1:8080/ | grep -q 'Deine Tiptoi-Bücher'

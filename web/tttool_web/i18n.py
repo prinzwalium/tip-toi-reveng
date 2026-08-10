@@ -90,6 +90,16 @@ def t(text: str, **kwargs) -> str:
     return translated.format(**kwargs) if kwargs else translated
 
 
+def plural(one: str, many: str, count: int, **kwargs) -> str:
+    """Pick the singular or the plural wording, then translate it.
+
+    Two whole sentences rather than a "(s)" glued to a word: German inflects
+    more than English does, and "1 Seite(n)" is how software talks, not how
+    people do.
+    """
+    return t(one if count == 1 else many, count=count, **kwargs)
+
+
 def catalog_for_js(keys: list[str]) -> dict[str, str]:
     """The subset the browser needs, as {source: translation}."""
     return {key: t(key) for key in keys}

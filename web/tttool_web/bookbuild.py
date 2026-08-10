@@ -25,12 +25,17 @@ from xml.sax.saxutils import escape
 from .book import Book, Page
 from .config import config
 from .i18n import t
+from .pictures import picture_pixels, print_copy
 from .projects import Project
 from .runner import run
 
 #: tttool draws its patterns on a grid of 48 units per millimetre. The page has
 #: to use the same unit or the dots come out at the wrong size.
 UNITS_PER_MM = 48
+
+#: Quality of the page picture inside the PDF. The dots are vector and
+#: unaffected; this is only the artwork a human looks at.
+PRINT_JPEG_QUALITY = 85
 
 PRINT_DIR = "druck"
 YAML_FILE = "book.yaml"
@@ -149,8 +154,14 @@ def _shape(area, fill: str, u: int, extra: str = "") -> str:
     )
 
 
-def compose_page_svg(project: Project, book: Book, page: Page, patterns: dict[str, str]) -> str:
-    """One printable page: picture, painted areas, power-on field."""
+def compose_page_svg(
+    project: Project, book: Book, page: Page, patterns: dict[str, str]
+) -> tuple[str, tuple[int, int] | None]:
+    """One printable page: picture, painted areas, power-on field.
+
+    Returns the SVG and the pixel size of the picture embedded in it, which
+    is what lets the PDF step find that one image again.
+    """
     page_w, page_h = book.page_size
     u = UNITS_PER_MM
 
@@ -164,11 +175,16 @@ def compose_page_svg(project: Project, book: Book, page: Page, patterns: dict[st
         defs += patterns["START"]
 
     body: list[str] = []
+    picture_size = None
     if page.image:
-        image_path = project.path / page.image
+        # Not the original: a print sized copy of it. A 300 dpi scan embedded
+        # as it was uploaded makes a PDF ten times larger than it needs to be,
+        # and the printer cannot tell the difference.
+        image_path = print_copy(project, page.image, page_w, page_h)
         if image_path.is_file():
             mime = mimetypes.guess_type(image_path.name)[0] or "image/png"
             data = base64.b64encode(image_path.read_bytes()).decode()
+            picture_size = picture_pixels(image_path)
             body.append(
                 f'<image x="0" y="0" width="{page_w * u}" height="{page_h * u}" '
                 f'preserveAspectRatio="xMidYMid meet" '
@@ -197,7 +213,7 @@ def compose_page_svg(project: Project, book: Book, page: Page, patterns: dict[st
     # A printed ruler mark: if this is not exactly 50 mm, the print was scaled.
     body.append(_ruler_svg(page_w, page_h, u))
 
-    return _svg_document(page_w, page_h, u, defs, body)
+    return _svg_document(page_w, page_h, u, defs, body), picture_size
 
 
 #: Sizes offered on the test page, in millimetres.
@@ -293,6 +309,37 @@ def _svg_to_pdf(svg_path: Path, pdf_path: Path) -> None:
     cairosvg.svg2pdf(url=str(svg_path), write_to=str(pdf_path))
 
 
+def _recompress_picture(pdf_path: Path, size: tuple[int, int]) -> None:
+    """Store the page picture in the PDF as JPEG instead of raw pixels.
+
+    Cairo writes every image losslessly, so a 300 dpi page picture arrives in
+    the PDF as some eighteen megabytes of deflated bitmap. Re-encoding just
+    that one image gives back a file of a couple of megabytes at the same
+    resolution.
+
+    Only the image with exactly the dimensions we embedded is touched. The dot
+    patterns are tiling *patterns*, not images, and are never rewritten — but
+    naming the picture by its size means that stays true even if a future
+    version of cairo decides to rasterise something.
+    """
+    from pypdf import PdfWriter
+
+    try:
+        writer = PdfWriter(clone_from=str(pdf_path))
+        touched = False
+        for page in writer.pages:
+            for image in page.images:
+                if image.image is not None and image.image.size == size:
+                    image.replace(image.image, quality=PRINT_JPEG_QUALITY)
+                    touched = True
+        if not touched:
+            return
+        with pdf_path.open("wb") as handle:
+            writer.write(handle)
+    except Exception:  # noqa: BLE001 - an optimisation, never a reason to fail
+        return
+
+
 def _merge_pdfs(parts: list[Path], target: Path) -> None:
     from pypdf import PdfWriter
 
@@ -328,6 +375,10 @@ def build(project: Project, book: Book) -> BuildResult:
     codes_dir = print_dir / "codes"
     shutil.rmtree(codes_dir, ignore_errors=True)
     codes_dir.mkdir(parents=True, exist_ok=True)
+    # A book that lost a page would otherwise keep offering the old seite-4.pdf
+    # for download, and the directory would grow for the life of the book.
+    for stale in print_dir.glob("seite-*.*"):
+        stale.unlink(missing_ok=True)
 
     drawn = run(
         [config.TTTOOL_BIN, "--image-format", "svg", "oid-codes", f"../../{YAML_FILE}"],
@@ -349,7 +400,7 @@ def build(project: Project, book: Book) -> BuildResult:
     pdf_parts: list[Path] = []
     codes: list[tuple[str, str, int]] = []
     for index, page in enumerate(book.pages, start=1):
-        svg = compose_page_svg(project, book, page, patterns)
+        svg, picture_size = compose_page_svg(project, book, page, patterns)
         svg_path = print_dir / f"seite-{index}.svg"
         svg_path.write_text(svg, encoding="utf-8")
         pdf_path = print_dir / f"seite-{index}.pdf"
@@ -362,6 +413,8 @@ def build(project: Project, book: Book) -> BuildResult:
                 hints=hints,
                 log="\n".join(log),
             )
+        if picture_size:
+            _recompress_picture(pdf_path, picture_size)
         pdf_parts.append(pdf_path)
         page_files.append(project.relpath_of(pdf_path))
         for area in page.areas:

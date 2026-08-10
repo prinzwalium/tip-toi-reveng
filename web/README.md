@@ -31,10 +31,20 @@ The editor needs no mouse: the tab key walks the areas of a page, the arrow
 keys move the selected one, `+` and `−` resize it, and shift makes the steps
 bigger. Every area carries a label for screen readers.
 
-**Passing a book on.** *Weitergeben* saves a whole book — pictures, sounds,
-areas and the code assignment — as a single `.tiptoi` file. *Buch hinzufügen*
-on any other server unpacks it into a book there, keeping the codes, so a page
-printed before the move still works after it. The same file is your backup.
+**Passing a book on, and backups.** *Weitergeben* saves a whole book —
+pictures, sounds, areas and the code assignment — as a single `.tiptoi` file.
+*Buch hinzufügen* on any other server unpacks it into a book there, keeping the
+codes, so a page printed before the move still works after it. *Alles sichern*
+does the same for every book at once; adding that file back restores all of
+them. A backup is just one `.tiptoi` per book in a ZIP, so a single book can be
+pulled out of it with any unzip program.
+
+**Big pictures are handled twice.** Upload the scan you have: the editor works
+on a small preview of it, while the original is kept untouched and printed
+from, re-encoded to print resolution on the way into the PDF. For an A4 page
+scanned at 300 dpi that is half a megabyte to the browser instead of twelve,
+and a two megabyte PDF instead of eighteen — at the same resolution on paper.
+The dot patterns are vector and are never re-encoded.
 
 Recording needs the page to be served over `https://` or opened on
 `localhost` — browsers do not allow microphone access otherwise.
@@ -130,8 +140,9 @@ Where your data lives
 ---------------------
 
 Everything is in `/data`, one directory per project — nothing else is stored,
-there is no database. Back it up by copying that directory (or by using
-“Download .zip” in the GUI).
+there is no database. Back it up by copying that directory, or from the GUI
+with *Alles sichern*, which writes every book into one `.tiptoi` file that
+*Buch hinzufügen* restores.
 
 The container runs as uid 1000. A named volume (the default) just works; for a
 directory on the host, point `TTTOOL_DATA` at it and make it writable for that

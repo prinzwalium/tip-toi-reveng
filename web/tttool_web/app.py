@@ -32,6 +32,7 @@ from .i18n import (
     UI_STRINGS,
     current_lang,
     known as known_lang,
+    plural,
     t,
 )
 from .projects import Project, ProjectError, list_projects
@@ -174,6 +175,7 @@ def create_app() -> Flask:
         return {"matching": matching, "other": other[:OTHER_FILES_LIMIT]}
 
     app.jinja_env.globals["t"] = t
+    app.jinja_env.globals["plural"] = plural
 
     @app.context_processor
     def template_globals():

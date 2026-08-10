@@ -292,8 +292,12 @@
 
   function showPicture() {
     if (currentPage.image) {
-      picture.setAttributeNS("http://www.w3.org/1999/xlink", "href", url(urls.raw, currentPage.image));
-      picture.setAttribute("href", url(urls.raw, currentPage.image));
+      // The preview is a smaller copy of the same picture; the original stays
+      // on the server for printing. A book made before previews existed, or a
+      // picture too small to be worth shrinking, has none.
+      var shown = url(urls.raw, currentPage.preview || currentPage.image);
+      picture.setAttributeNS("http://www.w3.org/1999/xlink", "href", shown);
+      picture.setAttribute("href", shown);
       picture.style.display = "";
     } else {
       picture.style.display = "none";
@@ -747,6 +751,7 @@
     flush().then(function () {
       post(url(urls.image, pageId), data, function (result) {
         currentPage.image = result.image;
+        currentPage.preview = result.preview || "";
         showPicture();
       });
     });
