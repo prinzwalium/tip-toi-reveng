@@ -768,3 +768,72 @@ def test_saving_the_layout_cannot_delete_the_library(client):
     assert book["pages"][0]["areas"][0]["sound_id"] == sound
     assert book["pages"][0]["areas"][0]["x"] == 20  # the move itself was saved
     assert (client.data_dir / name / "sounds" / f"{sound}.ogg").is_file()
+
+
+# -- starting points --------------------------------------------------------
+
+
+def test_the_example_starter_is_ready_to_build(client):
+    """A first book should work without the user adding anything."""
+    pytest.importorskip("PIL")
+    response = client.post("/books", data={"title": "Erstes Buch", "starter": "example"})
+    name = response.headers["Location"].rstrip("/").split("/")[-1]
+
+    book = client.get(f"/b/{name}/data").get_json()
+    assert book["pages"][0]["image"] == "seiten/s1.png"
+    assert (client.data_dir / name / "seiten" / "s1.png").is_file()
+    assert [a["name"] for a in book["pages"][0]["areas"]] == ["Hund", "Katze", "Kuh", "Ente"]
+    assert all(a["sound_id"] for a in book["pages"][0]["areas"])
+
+    result = client.post(f"/b/{name}/build").get_json()
+    assert result["ok"], result
+    assert len(result["codes"]) == 4
+
+
+def test_the_quiz_starter_comes_with_a_game(client):
+    pytest.importorskip("PIL")
+    response = client.post("/books", data={"title": "Quiz", "starter": "quiz"})
+    name = response.headers["Location"].rstrip("/").split("/")[-1]
+    book = client.get(f"/b/{name}/data").get_json()
+
+    assert len(book["groups"]) == 1
+    group = book["groups"][0]
+    assert group["kind"] == "quiz"
+    assert group["right_sound_id"] and group["wrong_sound_id"]
+    answers = [a for a in book["pages"][0]["areas"] if a["behaviour"] == "answer"]
+    assert len(answers) == 4
+    assert sum(1 for a in answers if a["correct"]) == 1
+
+    result = client.post(f"/b/{name}/build").get_json()
+    assert result["ok"], result
+
+
+def test_the_search_game_starter_rewards_the_last_find(client):
+    pytest.importorskip("PIL")
+    response = client.post("/books", data={"title": "Suchen", "starter": "collect"})
+    name = response.headers["Location"].rstrip("/").split("/")[-1]
+    book = client.get(f"/b/{name}/data").get_json()
+    group = book["groups"][0]
+    assert group["kind"] == "collect" and group["reward_sound_id"]
+
+    client.post(f"/b/{name}/build")
+    yaml = (client.data_dir / name / "book.yaml").read_text()
+    # four animals: the tap that finds the fourth plays the reward
+    assert f"$cnt{group['id']}==3?" in yaml
+    assert yaml.count(f"P({group['reward_sound_id']})") == 4
+
+
+def test_an_empty_book_stays_empty(client):
+    response = client.post("/books", data={"title": "Leer", "starter": "empty"})
+    name = response.headers["Location"].rstrip("/").split("/")[-1]
+    book = client.get(f"/b/{name}/data").get_json()
+    assert book["pages"][0]["areas"] == []
+    assert book["pages"][0]["image"] == ""
+    assert book["sounds"] == []
+
+
+def test_the_pen_page_explains_the_way_to_the_pen(client):
+    page = client.get("/hilfe/stift").data.decode()
+    assert "100%" in page
+    assert "tiptoi" in page
+    assert "50 mm" in page

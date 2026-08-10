@@ -160,21 +160,27 @@ are in 1.4, and every generated script was checked against the real tttool
 so they are waiting for someone to actually want them.
 
 
-Milestone 5 — the guided path
------------------------------
+Milestone 5 — the guided path ✅
+--------------------------------
 
-*Target version 1.5*
+*Shipped in 1.5 · the difference between “possible” and “obvious”*
 
-* A **start screen** that asks what you want to make (sound book, quiz, memory
-  game, blank) and sets the project up accordingly.
-* **Templates** with example artwork, so the first success takes minutes.
-* **“Put it on the pen”**: a page that explains, with pictures, how to plug in
-  the pen, where the file goes, and what to do when the pen ignores it.
+* A **start screen** that asks what you want to make (sound book, quiz,
+  collecting game, blank) and sets the book up accordingly.
+* **Starting points** with drawn example artwork and spoken sounds, so the
+  first book talks back within a minute of creating it.
+* **“Onto the pen”**: a page that explains, with pictures, how to plug in the
+  pen, where the file goes, and what to do when the pen ignores it.
 * A **checklist before printing**, with the printer settings that matter.
-* Undo/redo across the whole editor, and a warning before anything destructive.
+* Undo *and* redo across the whole editor, and a warning before anything
+  destructive.
 
 Done when: a first-time user reaches a working book from the start screen
 without asking anyone for help.
+
+Still open from this milestone: nobody has yet held a page printed by this
+program next to a pen. Everything up to the PDF is checked automatically —
+paper size, physical scale, dot pitch — but the last centimetre is unverified.
 
 
 Milestone 6 — sharing and finish

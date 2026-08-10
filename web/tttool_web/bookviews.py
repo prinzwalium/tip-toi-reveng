@@ -13,6 +13,7 @@ from flask import jsonify, redirect, render_template, request, url_for
 from .audio import VOICES, speak, speech_engine, store_sound
 from .book import GROUP_KINDS, PAPER_SIZES, Book, store_upload
 from .bookbuild import build, converters_available
+from .starters import STARTERS, apply_starter
 from .i18n import t
 from .projects import Project, ProjectError, list_projects, sanitize_filename
 
@@ -84,9 +85,11 @@ def register_book_routes(app, route, get_project):
         book = Book(title=title, paper=paper or Book().paper)
         book.product_id = _free_product_id(taken)
         book.add_page("Seite 1")
-        book.save(project)
         (project.path / "sounds").mkdir(exist_ok=True)
         (project.path / "seiten").mkdir(exist_ok=True)
+        starter = request.form.get("starter")
+        apply_starter(project, book, starter if starter in STARTERS else "empty")
+        book.save(project)
         return redirect(url_for("edit_book", name=project.name))
 
     def _free_product_id(taken_names: set[str]) -> int:

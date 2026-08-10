@@ -288,6 +288,39 @@ button.active { background: var(--accent); color: var(--accent-ink); border-colo
 .build-result .note.problem { border-left-color: var(--err); background: color-mix(in srgb, var(--err) 12%, transparent); }
 .build-step { margin: 8px 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
+/* ---- the guided path ---- */
+
+.starters { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; width: 100%; }
+.starter {
+  display: flex; gap: 10px; align-items: flex-start;
+  border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; cursor: pointer;
+}
+.starter:hover { border-color: var(--accent); }
+.starter input { margin-top: 3px; width: auto; }
+.starter-body { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.starter input:checked + .starter-body strong { color: var(--accent); }
+.starter-form { align-items: stretch; }
+
+.guide-strip { display: flex; align-items: center; gap: 16px; padding: 10px 16px; }
+.guide-steps { display: flex; flex-wrap: wrap; gap: 18px; margin: 0; padding: 0; list-style: none; flex: 1; font-size: 13px; }
+.guide-steps li { color: var(--muted); }
+.guide-steps li.done { text-decoration: line-through; opacity: .6; }
+.guide-steps li.now { color: var(--ink); font-weight: 600; }
+.guide-steps li.now::before { content: "→ "; color: var(--accent); }
+
+.checklist { margin: 8px 0; padding-left: 18px; font-size: 13px; }
+.checklist li { margin: 3px 0; }
+.print-check summary { color: var(--ink); }
+
+.guide { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
+.figure { width: 180px; flex: none; }
+.figure .ink-fill { fill: var(--muted); }
+.figure .paper { fill: var(--panel); stroke: var(--muted); stroke-width: 1.5; }
+.figure .line { stroke: var(--muted); stroke-width: 2; }
+.figure .dot { fill: var(--accent); }
+.steps { margin: 0; padding-left: 20px; font-size: 14px; }
+.steps li { margin: 6px 0; }
+
 /* ---- tooltips ---- */
 
 #tooltip {

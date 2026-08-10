@@ -19,6 +19,7 @@
   var currentPage = book.pages[0];
   var selectedId = null;
   var history = [];
+  var future = [];
   var saveTimer = null;
 
   function say(key) { return T[key] || key; }
@@ -35,6 +36,7 @@
   function snapshot() {
     history.push(JSON.stringify(book));
     if (history.length > 50) history.shift();
+    future.length = 0;   // a new change ends the redo chain
   }
 
   function saveNow() {
@@ -69,7 +71,7 @@
     return saveNow();
   }
 
-  function change() { render(); save(); }
+  function change() { render(); save(); updateGuide(); }
 
   // ------------------------------------------------------------ drawing
 
@@ -99,9 +101,9 @@
         g.appendChild(svg("rect", { x: a.x, y: a.y, width: a.w, height: a.h }));
       }
 
-      var label = svg("text", {
-        x: a.x + a.w / 2, y: a.y + a.h / 2, "text-anchor": "middle",
-      });
+      // Top left corner rather than the middle: the label names the area
+      // without covering the part of the picture the area is drawn around.
+      var label = svg("text", { x: a.x + 1.2, y: a.y + 3 });
       label.textContent = a.name || say("Area");
       g.appendChild(label);
 
@@ -588,7 +590,14 @@
       finishDrawing();
       return;
     }
-    if ((event.ctrlKey || event.metaKey) && event.key === "z") { event.preventDefault(); undo(); }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
+      event.preventDefault();
+      if (event.shiftKey) redo(); else undo();
+    }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "y") {
+      event.preventDefault();
+      redo();
+    }
     if (event.key === "Delete" && selected() && document.activeElement === document.body) {
       document.getElementById("area-delete").click();
     }
@@ -597,7 +606,18 @@
   function undo() {
     var previous = history.pop();
     if (!previous) return;
-    var restored = JSON.parse(previous);
+    future.push(JSON.stringify(book));
+    apply(JSON.parse(previous));
+  }
+
+  function redo() {
+    var next = future.pop();
+    if (!next) return;
+    history.push(JSON.stringify(book));
+    apply(JSON.parse(next));
+  }
+
+  function apply(restored) {
     book.pages = restored.pages;
     currentPage = book.pages.filter(function (p) { return p.id === currentPage.id; })[0] || book.pages[0];
     selectedId = null;
@@ -807,7 +827,38 @@
     });
   });
 
+  // ------------------------------------------------------- the guide
+
+  var guide = document.getElementById("guide-strip");
+  var GUIDE_KEY = "tttool-guide-hidden";
+
+  function updateGuide() {
+    if (!guide || window.localStorage.getItem(GUIDE_KEY) === "1") return;
+    var areas = book.pages.reduce(function (total, page) { return total + page.areas.length; }, 0);
+    var withSound = book.pages.some(function (page) {
+      return page.areas.some(function (a) { return a.sound_id || (a.sound_ids || []).length; });
+    });
+    var step = !currentPage.image ? "picture" : !areas ? "area" : !withSound ? "sound" : "build";
+    guide.classList.remove("hidden");
+    Array.prototype.forEach.call(guide.querySelectorAll("[data-step]"), function (item) {
+      item.classList.toggle("now", item.dataset.step === step);
+      item.classList.toggle("done", stepIndex(item.dataset.step) < stepIndex(step));
+    });
+  }
+
+  function stepIndex(step) {
+    return ["picture", "area", "sound", "build"].indexOf(step);
+  }
+
+  if (guide) {
+    document.getElementById("guide-hide").addEventListener("click", function () {
+      window.localStorage.setItem(GUIDE_KEY, "1");
+      guide.classList.add("hidden");
+    });
+  }
+
   renderPages();
   showPicture();
   render();
+  updateGuide();
 })();

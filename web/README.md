@@ -6,15 +6,24 @@ German by default (`TTTOOL_WEB_LANG=en` switches to English).
 
 **Making a book** — the part that needs no technical knowledge:
 
- 1. *Neues Buch*, give it a name, pick the paper size.
- 2. Upload a picture of the page.
+ 1. *Neues Buch*: pick what you want to make — a sound book, a quiz, a
+    collecting game, or an empty book — give it a name and a paper size. The
+    first three come with an example page whose areas already talk, so there is
+    something to try before anything has been uploaded.
+ 2. Upload a picture of the page (replacing the example one).
  3. Drag rectangles onto it (or click the corners of a free shape), one per
     thing that should make a sound.
  4. Give each one a sound: record it with the microphone, let the computer
     speak a sentence, or upload a file. Sounds live in the book's library and
-    can be reused on as many areas as you like.
+    can be reused on as many areas as you like. An area can also do more than
+    play: at random, one after the other, right/wrong in a quiz, or count
+    towards a collecting game.
  5. *Buch erstellen* → a test page for your printer, a PDF to print, and a
     `.gme` file to copy onto the pen.
+
+A strip above the editor shows which of those steps you are on, and
+*Auf den Stift* in the menu (`/hilfe/stift`) walks through printing and copying
+with pictures — including what to check when the pen stays silent.
 
 Recording needs the page to be served over `https://` or opened on
 `localhost` — browsers do not allow microphone access otherwise.

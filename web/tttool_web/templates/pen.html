@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}{{ t("Onto the pen") }}{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <h1>{{ t("From here onto the pen") }}</h1>
+  <p class="muted">{{ t("Two files, two steps: print one, copy the other.") }}</p>
+</section>
+
+<section class="card">
+  <h2>{{ t("1. Print") }}</h2>
+  <div class="guide">
+    <svg viewBox="0 0 120 80" class="figure" role="img" aria-label="{{ t('A printer with a sheet') }}">
+      <rect x="20" y="30" width="80" height="34" rx="4" class="ink-fill"/>
+      <rect x="34" y="8" width="52" height="26" rx="2" class="paper"/>
+      <rect x="34" y="52" width="52" height="22" rx="2" class="paper"/>
+      <circle cx="88" cy="42" r="3" class="dot"/>
+      <line x1="40" y1="60" x2="70" y2="60" class="line"/>
+      <line x1="40" y1="66" x2="60" y2="66" class="line"/>
+    </svg>
+    <ol class="steps">
+      <li>{{ t("Print the test page first — one sheet tells you whether your printer can do this at all.") }}</li>
+      <li><strong>{{ t("Print at 100%.") }}</strong> {{ t("Never “fit to page”, “shrink to fit” or “scale”. This is the mistake that makes a perfect looking book do nothing.") }}</li>
+      <li>{{ t("Use a laser printer. The pen reads black toner; most inkjets do not work.") }}</li>
+      <li>{{ t("Measure the printed 50 mm line with a ruler. If it is not 50 mm, the print was scaled — print again.") }}</li>
+      <li>{{ t("Tap the squares on the test page with the pen. The smallest one that answers is the smallest area you should use.") }}</li>
+    </ol>
+  </div>
+</section>
+
+<section class="card">
+  <h2>{{ t("2. Copy onto the pen") }}</h2>
+  <div class="guide">
+    <svg viewBox="0 0 120 80" class="figure" role="img" aria-label="{{ t('The pen connected to a computer') }}">
+      <rect x="8" y="20" width="46" height="34" rx="3" class="ink-fill"/>
+      <rect x="12" y="24" width="38" height="24" rx="2" class="paper"/>
+      <path d="M62 37 h18" class="line"/>
+      <path d="M74 33 l6 4 l-6 4 z" class="ink-fill"/>
+      <rect x="86" y="14" width="14" height="52" rx="7" class="ink-fill"/>
+      <circle cx="93" cy="62" r="3" class="dot"/>
+    </svg>
+    <ol class="steps">
+      <li>{{ t("Plug the pen into the computer with the USB cable and switch it on.") }}</li>
+      <li>{{ t("It appears as a drive called “tiptoi”.") }}</li>
+      <li>{{ t("Copy the .gme file into the top level of that drive — not into a folder.") }}</li>
+      <li>{{ t("Eject the drive safely and unplug the pen.") }}</li>
+      <li>{{ t("Tap the power-on field on your printed page. The pen says it is loading, and then your book works.") }}</li>
+    </ol>
+  </div>
+</section>
+
+<section class="card">
+  <h2>{{ t("When the pen does not play along")}}</h2>
+  <dl class="cmdlist">
+    <dt>{{ t("The pen asks for the power-on field again and again") }}</dt>
+    <dd>{{ t("It cannot read the field. Check the print scale (the 50 mm line), print on a laser printer, and keep the field away from dark artwork.") }}</dd>
+
+    <dt>{{ t("Nothing happens anywhere on the page") }}</dt>
+    <dd>{{ t("The .gme file is probably not on the pen, or it landed in a folder. It has to sit directly on the drive.") }}</dd>
+
+    <dt>{{ t("The pen says the file does not belong to this product") }}</dt>
+    <dd>{{ t("Another book on the pen uses the same book number. Give this book a different number and build it again.") }}</dd>
+
+    <dt>{{ t("Only some areas answer") }}</dt>
+    <dd>{{ t("Those areas are probably too small, or the picture under them is too dark. The editor warns about both before you print.") }}</dd>
+
+    <dt>{{ t("The pen stays silent although it was loading") }}</dt>
+    <dd>{{ t("Check that the areas have a sound: an area without one is left out of the book.") }}</dd>
+  </dl>
+</section>
+{% endblock %}

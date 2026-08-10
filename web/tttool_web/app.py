@@ -359,6 +359,11 @@ def create_app() -> Flask:
     def help_page():
         return render_template("help.html", commands=COMMANDS, groups=GROUPS)
 
+    @route("/hilfe/stift")
+    def pen_page():
+        """How the printed page and the file get to the pen."""
+        return render_template("pen.html")
+
     @app.route("/healthz")
     def healthz():
         return jsonify(

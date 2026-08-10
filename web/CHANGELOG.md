@@ -7,6 +7,30 @@ YYYY-MM-DD.
 Unreleased
 ----------
 
+1.5.0 — the guided path
+-----------------------
+
+Milestone 5 of `ROADMAP.md`. Everything the previous versions made *possible*
+this one tries to make *obvious*. Nothing here adds a capability to the pen; it
+adds a path through the program for someone who has never made a book before.
+
+* **Starting points instead of an empty page.** Creating a book asks what you
+  want to make — a sound book, a quiz, a collecting game, or nothing at all —
+  and sets it up: an example picture drawn to the page size, areas already
+  painted on it, and sounds that already speak. A new book says something on
+  the first tap without anything being uploaded.
+* **The four steps, always visible.** A strip above the editor shows where you
+  are — picture, areas, sounds, build — with the step you are on marked and the
+  ones you finished struck through. It can be hidden, and stays hidden.
+* **“Onto the pen”**, a page of its own: printing at 100 %, why a laser
+  printer, how to measure the test page, where the `.gme` file goes on the pen,
+  and the five things people actually run into when the pen stays silent.
+* **A checklist before printing** in the editor, next to the build button, so
+  the printer dialogue settings are read at the moment they matter.
+* **Redo**, next to the undo that was already there (`Ctrl+Shift+Z`, `Ctrl+Y`).
+* Area names are drawn in the corner of the area now, not across the middle of
+  the picture.
+
 1.4.0 — games without programming
 ---------------------------------
 

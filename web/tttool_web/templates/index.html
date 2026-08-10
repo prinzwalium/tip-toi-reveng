@@ -11,21 +11,56 @@
 
 <section class="card">
   <h2>{{ t("New book") }}</h2>
-  <form method="post" action="{{ url_for('create_book') }}" class="row">
-    <label class="field compact" data-tip="{{ t('You can change this later.') }}">
-      <span class="label">{{ t("Name") }}</span>
-      <input name="title" placeholder="{{ t('Farm book') }}" required maxlength="80" autocomplete="off">
-    </label>
-    <label class="field compact" data-tip="{{ t('The paper you will print on. Landscape suits a double page.') }}">
-      <span class="label">{{ t("Paper") }}</span>
-      <select name="paper">
-        <option value="a4-landscape">{{ t("A4 landscape") }}</option>
-        <option value="a4-portrait">{{ t("A4 portrait") }}</option>
-        <option value="a5-landscape">{{ t("A5 landscape") }}</option>
-        <option value="a5-portrait">{{ t("A5 portrait") }}</option>
-      </select>
-    </label>
-    <button type="submit">{{ t("Create book") }}</button>
+  <form method="post" action="{{ url_for('create_book') }}" class="stack starter-form">
+    <p class="muted hint">{{ t("What would you like to make? You can change everything later.") }}</p>
+
+    <div class="starters">
+      <label class="starter">
+        <input type="radio" name="starter" value="example" checked>
+        <span class="starter-body">
+          <strong>{{ t("A sound book") }}</strong>
+          <span class="muted">{{ t("Four animals on an example page that already talk. Best place to start.") }}</span>
+        </span>
+      </label>
+      <label class="starter">
+        <input type="radio" name="starter" value="quiz">
+        <span class="starter-body">
+          <strong>{{ t("A quiz") }}</strong>
+          <span class="muted">{{ t("A question and four answers; right and wrong already react.") }}</span>
+        </span>
+      </label>
+      <label class="starter">
+        <input type="radio" name="starter" value="collect">
+        <span class="starter-body">
+          <strong>{{ t("A search game") }}</strong>
+          <span class="muted">{{ t("Find them all — with a reward when the last one is found.") }}</span>
+        </span>
+      </label>
+      <label class="starter">
+        <input type="radio" name="starter" value="empty">
+        <span class="starter-body">
+          <strong>{{ t("An empty book") }}</strong>
+          <span class="muted">{{ t("Start with your own picture right away.") }}</span>
+        </span>
+      </label>
+    </div>
+
+    <div class="row">
+      <label class="field compact" data-tip="{{ t('You can change this later.') }}">
+        <span class="label">{{ t("Name") }}</span>
+        <input name="title" placeholder="{{ t('Farm book') }}" required maxlength="80" autocomplete="off">
+      </label>
+      <label class="field compact" data-tip="{{ t('The paper you will print on. Landscape suits a double page.') }}">
+        <span class="label">{{ t("Paper") }}</span>
+        <select name="paper">
+          <option value="a4-landscape">{{ t("A4 landscape") }}</option>
+          <option value="a4-portrait">{{ t("A4 portrait") }}</option>
+          <option value="a5-landscape">{{ t("A5 landscape") }}</option>
+          <option value="a5-portrait">{{ t("A5 portrait") }}</option>
+        </select>
+      </label>
+      <button type="submit">{{ t("Create book") }}</button>
+    </div>
   </form>
 </section>
 

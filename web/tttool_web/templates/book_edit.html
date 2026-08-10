@@ -21,6 +21,16 @@
   </div>
 </section>
 
+<div id="guide-strip" class="card guide-strip hidden">
+  <ol class="guide-steps">
+    <li data-step="picture">{{ t("1. Choose a picture") }}</li>
+    <li data-step="area">{{ t("2. Drag areas onto it") }}</li>
+    <li data-step="sound">{{ t("3. Give each area a sound") }}</li>
+    <li data-step="build">{{ t("4. Make the book, print it, copy it onto the pen") }}</li>
+  </ol>
+  <button type="button" class="ghost" id="guide-hide">{{ t("Hide") }}</button>
+</div>
+
 <div class="book-layout">
   <section class="card book-canvas-card">
     <div class="row book-toolbar">
@@ -157,6 +167,17 @@
         <p class="note">{{ t("This installation cannot create PDFs. Please update the container image.") }}</p>
       {% endif %}
       <div id="build-result" class="build-result hidden"></div>
+
+      <details class="drawer print-check">
+        <summary>{{ t("Before you print") }}</summary>
+        <ul class="checklist">
+          <li>{{ t("Print the test page first.") }}</li>
+          <li>{{ t("Print at 100% — never “fit to page”.") }}</li>
+          <li>{{ t("A laser printer; most inkjets do not work.") }}</li>
+          <li>{{ t("Measure the printed 50 mm line with a ruler.") }}</li>
+        </ul>
+        <a href="{{ url_for('pen_page') }}">{{ t("The whole way onto the pen →") }}</a>
+      </details>
     </div>
   </section>
 </div>
