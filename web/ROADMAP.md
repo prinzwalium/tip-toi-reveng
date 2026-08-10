@@ -130,10 +130,10 @@ or from localhost — that is a browser rule, not something the program can lift
 so the recording tab says so instead of failing silently.
 
 
-Milestone 4 — games without programming
----------------------------------------
+Milestone 4 — games without programming ✅
+------------------------------------------
 
-*Target version 1.4 · this is where a “book maker” becomes a “game maker”*
+*Shipped in 1.4 · this is where a “book maker” becomes a “game maker”*
 
 The pen can do far more than play a sound per area — count, remember, choose at
 random, react differently the second time. Today that means writing script
@@ -152,6 +152,12 @@ Each behaviour is a small form, and generates the script underneath. An
 handbook and wants more.
 
 Done when: a memory game and a quiz can be built without ever seeing a script.
+
+Status: random, sequence, quiz, find-them-all and the hand-written escape hatch
+are in 1.4, and every generated script was checked against the real tttool
+(assembled and linted, not only unit tested). Counters as a separate behaviour
+— score, lives — are not there yet: “find them all” covers the same mechanism,
+so they are waiting for someone to actually want them.
 
 
 Milestone 5 — the guided path

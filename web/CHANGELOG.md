@@ -7,6 +7,28 @@ YYYY-MM-DD.
 Unreleased
 ----------
 
+1.4.0 — games without programming
+---------------------------------
+
+Milestone 4 of `ROADMAP.md`. An area no longer only plays a sound; it can do
+the things the pen is actually capable of, chosen from a list instead of
+written as a script.
+
+* **One of several, at random** — for variety, so the dog does not say exactly
+  the same thing every time.
+* **One after the other** — a story in pieces, one per tap, starting over at
+  the end.
+* **Quiz** — mark areas as the right or a wrong answer of a game, and give the
+  game its “right” and “wrong” sounds once.
+* **Find them all** — every area of a collecting game counts itself when it is
+  first tapped, and the last one missing triggers the reward.
+* **Written by hand** — a raw script per area for anyone who has read the
+  handbook, with the rest of the panel ignored.
+
+Underneath, each behaviour generates ordinary tttool script lines with the
+registers it needs; the generated file is quoted throughout, so a hand-written
+script can never break the structure of the YAML.
+
 1.3.0 — sound without fuss
 --------------------------
 

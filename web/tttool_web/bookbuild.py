@@ -79,11 +79,17 @@ def write_yaml(project: Project, book: Book) -> str:
     ]
     for page in book.pages:
         for area in page.areas:
-            if not area.sound_id:
+            script = book.script_lines(page, area)
+            if not script:
                 continue
-            # The library file is sounds/<sound id>.ogg, and media-path adds
-            # the folder and the extension.
-            lines.append(f"  {book.script_name(page, area)}: P({area.sound_id})")
+            name = book.script_name(page, area)
+            # Every line is quoted, so a hand-written script cannot break out of
+            # the file structure. tttool reads a quoted line exactly the same.
+            if len(script) == 1:
+                lines.append(f"  {name}: {_yaml_string(script[0])}")
+            else:
+                lines.append(f"  {name}:")
+                lines += [f"  - {_yaml_string(line)}" for line in script]
     text = "\n".join(lines) + "\n"
     return project.write_text(YAML_FILE, text)
 
@@ -151,7 +157,7 @@ def compose_page_svg(project: Project, book: Book, page: Page, patterns: dict[st
     used = {
         book.script_name(page, area): area
         for area in page.areas
-        if area.sound_id and book.script_name(page, area) in patterns
+        if book.plays_something(area) and book.script_name(page, area) in patterns
     }
     defs = "".join(patterns[name] for name in used)
     if "START" in patterns:
@@ -360,7 +366,7 @@ def build(project: Project, book: Book) -> BuildResult:
         page_files.append(project.relpath_of(pdf_path))
         for area in page.areas:
             name = book.script_name(page, area)
-            if area.sound_id and name in code_numbers:
+            if book.plays_something(area) and name in code_numbers:
                 codes.append((page.name or page.id, area.name or area.id, code_numbers[name]))
 
     book_pdf = print_dir / f"{_slug(book.title)}.pdf"
@@ -369,7 +375,7 @@ def build(project: Project, book: Book) -> BuildResult:
     # The test page: the same code at several sizes, to try the printer with.
     test_pdf = ""
     sample = next(
-        (book.script_name(p, a) for p in book.pages for a in p.areas if a.sound_id), ""
+        (book.script_name(p, a) for p in book.pages for a in p.areas if book.plays_something(a)), ""
     )
     if sample:
         test_svg = print_dir / "druckprobe.svg"

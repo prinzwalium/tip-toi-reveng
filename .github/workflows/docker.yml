@@ -183,6 +183,12 @@ jobs:
           sound_id=$(echo "$spoken" | sed -n 's/.*"sound": *"\([^"]*\)".*/\1/p')
           curl -fsS -o /dev/null -X POST \
             --data "sound_id=$sound_id" http://127.0.0.1:8080/b/ci-buch/areas/a1/sound
+
+          # A behaviour that generates a script with registers, so that what
+          # the editor produces really is something tttool accepts.
+          curl -fsS -o /dev/null -X PUT http://127.0.0.1:8080/b/ci-buch/data \
+            -H 'Content-Type: application/json' \
+            -d "{\"title\":\"CI Buch\",\"product_id\":42,\"paper\":\"a4-landscape\",\"pages\":[{\"id\":\"s1\",\"name\":\"Seite 1\",\"image\":\"\",\"areas\":[{\"id\":\"a1\",\"name\":\"Hund\",\"x\":20,\"y\":20,\"w\":40,\"h\":30,\"behaviour\":\"sequence\",\"sound_ids\":[\"$sound_id\",\"$sound_id\"]}]}]}"
           result=$(curl -fsS -X POST http://127.0.0.1:8080/b/ci-buch/build)
           echo "$result"
           echo "$result" | grep -q '"ok":true'

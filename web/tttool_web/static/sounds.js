@@ -110,7 +110,8 @@ window.SoundPicker = (function () {
   }
 
   function choose(soundId) {
-    if (onPick) onPick(null, soundId);
+    // Hand the current library along, so the caller's copy stays in step.
+    if (onPick) onPick({ sounds: sounds }, soundId);
     close();
   }
 

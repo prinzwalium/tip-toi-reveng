@@ -36,6 +36,15 @@ MIN_AREA_MM = 10.0
 POWER_FIELD_MM = 20.0
 POWER_FIELD_MARGIN_MM = 8.0
 
+#: What an area can do. The interface offers exactly these.
+BEHAVIOURS = ("play", "random", "sequence", "answer", "collect", "advanced")
+GROUP_KINDS = ("quiz", "collect")
+#: Characters a hand-written script line may contain — a typo should be caught
+#: by tttool, but nothing here may break out of the YAML file.
+SCRIPT_LINE_RE = re.compile(r"^[A-Za-z0-9_$?:=+*<>!,() .-]{0,200}$")
+#: … and a line that reads like a YAML key is not a script line at all.
+YAML_KEY_RE = re.compile(r"^[A-Za-z0-9_-]+:(\s|$)")
+
 IMAGE_SUFFIXES = (".png", ".jpg", ".jpeg", ".gif")
 ID_RE = re.compile(r"^[a-z][a-z0-9]{0,15}$")
 #: Sound paths as written by version 1 of the format: sounds/<area>.ogg
@@ -65,6 +74,19 @@ class Sound:
 
 
 @dataclass
+class Group:
+    """A quiz or a collecting game: several areas that belong together."""
+
+    id: str
+    name: str = ""
+    #: "quiz" — right and wrong answers; "collect" — find them all.
+    kind: str = "quiz"
+    right_sound_id: str = ""
+    wrong_sound_id: str = ""
+    reward_sound_id: str = ""
+
+
+@dataclass
 class Area:
     id: str
     name: str = ""
@@ -78,6 +100,16 @@ class Area:
     points: list[list[float]] = field(default_factory=list)
     #: Which sound of the library plays here; empty while the area is silent.
     sound_id: str = ""
+    #: What happens when the pen touches this area — see BEHAVIOURS.
+    behaviour: str = "play"
+    #: For "random" and "sequence": the sounds to choose between, in order.
+    sound_ids: list[str] = field(default_factory=list)
+    #: For "answer" and "collect": which game this area belongs to.
+    group: str = ""
+    #: For "answer": is this the right one?
+    correct: bool = False
+    #: For "advanced": script lines written by hand.
+    script: str = ""
 
     @property
     def is_polygon(self) -> bool:
@@ -142,6 +174,7 @@ class Book:
     paper: str = DEFAULT_PAPER
     pages: list[Page] = field(default_factory=list)
     sounds: list[Sound] = field(default_factory=list)
+    groups: list[Group] = field(default_factory=list)
     version: int = FORMAT_VERSION
 
     # -- geometry ---------------------------------------------------------
@@ -179,6 +212,98 @@ class Book:
         sound = Sound(id=_next_id("t", {s.id for s in self.sounds}), **kwargs)
         self.sounds.append(sound)
         return sound
+
+    def group_of(self, group_id: str) -> Group:
+        for group in self.groups:
+            if group.id == group_id:
+                return group
+        raise ProjectError(t("This game does not exist any more."))
+
+    def add_group(self, **kwargs) -> Group:
+        group = Group(id=_next_id("g", {g.id for g in self.groups}), **kwargs)
+        self.groups.append(group)
+        return group
+
+    def group_members(self, group_id: str) -> list[Area]:
+        return [
+            area
+            for page in self.pages
+            for area in page.areas
+            if area.group == group_id and area.behaviour in ("answer", "collect")
+        ]
+
+    # -- what an area does ------------------------------------------------
+
+    def area_sounds(self, area: Area) -> list[str]:
+        """The sounds this area plays, in order."""
+        if area.behaviour in ("random", "sequence"):
+            return list(area.sound_ids)
+        return [area.sound_id] if area.sound_id else []
+
+    def script_lines(self, page: Page, area: Area) -> list[str]:
+        """The tttool script for one area — this is where a behaviour becomes
+        the little program the pen runs."""
+        sounds = self.area_sounds(area)
+
+        if area.behaviour == "advanced":
+            return [
+                line.strip()
+                for line in area.script.splitlines()
+                if line.strip()
+                and SCRIPT_LINE_RE.match(line.strip())
+                and not YAML_KEY_RE.match(line.strip())
+            ]
+
+        if area.behaviour == "random" and len(sounds) >= 2:
+            # One P() with several sounds: the pen picks by an internal counter.
+            return [f"P({','.join(sounds)})"]
+
+        if area.behaviour == "sequence" and len(sounds) >= 2:
+            # A register remembers how far we are; the last step wraps around.
+            register = f"$seq{area.id}"
+            return [
+                f"{register}=={index}? {register}:={(index + 1) % len(sounds)} P({sound})"
+                for index, sound in enumerate(sounds)
+            ]
+
+        if area.behaviour == "answer" and area.group:
+            group = next((g for g in self.groups if g.id == area.group), None)
+            if group:
+                reaction = group.right_sound_id if area.correct else group.wrong_sound_id
+                parts = [f"P({s})" for s in sounds[:1]]
+                if reaction:
+                    parts.append(f"P({reaction})")
+                return [" ".join(parts)] if parts else []
+
+        if area.behaviour == "collect" and area.group:
+            group = next((g for g in self.groups if g.id == area.group), None)
+            if group:
+                members = self.group_members(group.id)
+                found = f"$got{area.id}"
+                counter = f"$cnt{group.id}"
+                own = f"P({sounds[0]})" if sounds else ""
+                lines = []
+                # Tapping the last missing one completes the game.
+                if group.reward_sound_id and len(members) >= 1:
+                    lines.append(
+                        " ".join(filter(None, [
+                            f"{found}==0?", f"{counter}=={len(members) - 1}?",
+                            f"{found}:=1", f"{counter}+=1", own,
+                            f"P({group.reward_sound_id})",
+                        ]))
+                    )
+                lines.append(
+                    " ".join(filter(None, [f"{found}==0?", f"{found}:=1", f"{counter}+=1", own]))
+                )
+                if own:
+                    lines.append(own)  # already found: just play it again
+                return lines
+
+        return [f"P({sounds[0]})"] if sounds else []
+
+    def plays_something(self, area: Area) -> bool:
+        """Whether this area does anything at all when touched."""
+        return bool(self.script_lines(Page(id="x"), area))
 
     def sound_usage(self) -> dict[str, int]:
         """How many areas play each sound — shown before deleting one."""
@@ -255,7 +380,15 @@ class Book:
     # -- persistence ------------------------------------------------------
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Book":
+    def from_dict(cls, data: dict, keep: "Book | None" = None) -> "Book":
+        """Build a book from ``data``.
+
+        ``keep`` is the book as the server has it. When it is given — that is,
+        when the data comes from a browser — the sound library and the games
+        are taken from it and never from the payload: files on disk belong to
+        the server, and a stale copy in a browser tab must not be able to
+        delete them.
+        """
         if not isinstance(data, dict):
             raise ProjectError("The book file is damaged")
         book = cls(
@@ -293,6 +426,17 @@ class Book:
                         if isinstance(p, (list, tuple)) and len(p) == 2
                     ],
                     sound_id=str(raw_area.get("sound_id") or ""),
+                    behaviour=(
+                        raw_area.get("behaviour")
+                        if raw_area.get("behaviour") in BEHAVIOURS
+                        else "play"
+                    ),
+                    sound_ids=[
+                        str(s) for s in (raw_area.get("sound_ids") or [])[:20] if str(s)
+                    ],
+                    group=str(raw_area.get("group") or "")[:16],
+                    correct=bool(raw_area.get("correct")),
+                    script=str(raw_area.get("script") or "")[:1000],
                 )
                 if not ID_RE.match(area.id):
                     area.id = _next_id("a", {a.id for p in book.pages for a in p.areas})
@@ -305,7 +449,12 @@ class Book:
                 page.areas.append(area)
             book.pages.append(page)
 
-        for raw_sound in data.get("sounds") or []:
+        if keep is not None:
+            book.sounds = keep.sounds
+            book.groups = keep.groups
+            legacy.clear()
+
+        for raw_sound in (data.get("sounds") or []) if keep is None else []:
             sound = Sound(
                 id=str(raw_sound.get("id") or ""),
                 name=str(raw_sound.get("name") or "")[:120],
@@ -333,11 +482,33 @@ class Book:
                     book.sounds.append(existing)
                 area.sound_id = existing.id
 
+        for raw_group in (data.get("groups") or []) if keep is None else []:
+            group = Group(
+                id=str(raw_group.get("id") or ""),
+                name=str(raw_group.get("name") or "")[:80],
+                kind=raw_group.get("kind") if raw_group.get("kind") in GROUP_KINDS else "quiz",
+                right_sound_id=str(raw_group.get("right_sound_id") or ""),
+                wrong_sound_id=str(raw_group.get("wrong_sound_id") or ""),
+                reward_sound_id=str(raw_group.get("reward_sound_id") or ""),
+            )
+            if ID_RE.match(group.id):
+                book.groups.append(group)
+
         known = {s.id for s in book.sounds}
+        for group in book.groups:
+            for field_name in ("right_sound_id", "wrong_sound_id", "reward_sound_id"):
+                if getattr(group, field_name) not in known:
+                    setattr(group, field_name, "")
+        group_ids = {g.id for g in book.groups}
         for page in book.pages:
             for area in page.areas:
                 if area.sound_id not in known:
                     area.sound_id = ""
+                area.sound_ids = [s for s in area.sound_ids if s in known]
+                if area.group not in group_ids:
+                    area.group = ""
+                if area.behaviour in ("answer", "collect") and not area.group:
+                    area.behaviour = "play"
 
         if not book.pages:
             book.add_page()
@@ -394,7 +565,7 @@ class Book:
                     if fitted_w <= 0 or fitted_h <= 0:
                         continue
                     for area in page.areas:
-                        if not area.sound_id:
+                        if not self.plays_something(area):
                             continue
                         left = (area.x - ox) / fitted_w * image_w
                         top = (area.y - oy) / fitted_h * image_h
@@ -436,11 +607,11 @@ class Book:
                     t("“{label}” has no picture yet — the codes will be printed on a blank page.",
                       label=label)
                 )
-            if not [a for a in page.areas if a.sound_id]:
+            if not [a for a in page.areas if self.plays_something(a)]:
                 problems.append(t("“{label}” has no area with a sound yet.", label=label))
             for area in page.areas:
                 name = area.name or t("Unnamed area")
-                if not area.sound_id:
+                if not self.plays_something(area):
                     hints.append(
                         t("“{name}” on “{label}” has no sound and is left out.",
                           name=name, label=label)
