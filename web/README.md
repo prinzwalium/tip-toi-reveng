@@ -8,9 +8,16 @@ German by default (`TTTOOL_WEB_LANG=en` switches to English).
 
  1. *Neues Buch*, give it a name, pick the paper size.
  2. Upload a picture of the page.
- 3. Drag rectangles onto it, one per thing that should make a sound, and give
-    each one a sound file.
- 4. *Buch erstellen* → a PDF to print and a `.gme` file to copy onto the pen.
+ 3. Drag rectangles onto it (or click the corners of a free shape), one per
+    thing that should make a sound.
+ 4. Give each one a sound: record it with the microphone, let the computer
+    speak a sentence, or upload a file. Sounds live in the book's library and
+    can be reused on as many areas as you like.
+ 5. *Buch erstellen* → a test page for your printer, a PDF to print, and a
+    `.gme` file to copy onto the pen.
+
+Recording needs the page to be served over `https://` or opened on
+`localhost` — browsers do not allow microphone access otherwise.
 
 Print the PDF **at 100%** (never “fit to page”) on a laser printer, check the
 printed 50 mm mark with a ruler, tap the power-on field, and the pen reads your

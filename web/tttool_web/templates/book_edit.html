@@ -25,12 +25,19 @@
   <section class="card book-canvas-card">
     <div class="row book-toolbar">
       <strong>{{ t("Page") }}</strong>
-      <select id="page-picker">
-        {% for page in book.pages %}
-          <option value="{{ page.id }}">{{ page.name or page.id }}</option>
-        {% endfor %}
-      </select>
+      <select id="page-picker"></select>
+      <input type="text" id="page-name" class="page-name" autocomplete="off"
+             data-tip="{{ t('The name of this page — only you see it.') }}">
+      <button type="button" id="page-up" class="ghost" data-tip="{{ t('Move page forward.') }}">↑</button>
+      <button type="button" id="page-down" class="ghost" data-tip="{{ t('Move page back.') }}">↓</button>
+      <button type="button" id="page-add" class="ghost" data-tip="{{ t('Add another page.') }}">+ {{ t("Page") }}</button>
+      <button type="button" id="page-duplicate" class="ghost"
+              data-tip="{{ t('Copy this page with all its areas.') }}">⧉</button>
+      <button type="button" id="page-delete" class="ghost danger"
+              data-tip="{{ t('Delete this page with everything on it.') }}">×</button>
+    </div>
 
+    <div class="row book-toolbar">
       <label class="button ghost file-button"
              data-tip="{{ t('A photo or scan of the page you want to make tappable.') }}">
         {{ t("Choose picture …") }}
@@ -39,9 +46,12 @@
 
       <button type="button" id="add-area" class="ghost"
               data-tip="{{ t('Then drag a rectangle onto the picture.') }}">+ {{ t("Area") }}</button>
+      <button type="button" id="add-polygon" class="ghost"
+              data-tip="{{ t('For anything that is not a rectangle: click the corners, close it by clicking the first one again.') }}">
+        + {{ t("Free shape") }}</button>
       <button type="button" id="undo" class="ghost" data-tip="{{ t('Undo the last change (Ctrl+Z).') }}">↶</button>
       <span class="grow"></span>
-      <span class="muted hint">{{ t("Drag on the picture to create an area.") }}</span>
+      <span id="canvas-hint" class="muted hint">{{ t("Drag on the picture to create an area.") }}</span>
     </div>
 
     <div id="stage" class="stage">
@@ -82,18 +92,20 @@
 
       <div class="sound-box">
         <div class="row">
-          <label class="button ghost file-button">
-            {{ t("Choose sound …") }}
-            <input type="file" id="area-sound" accept="audio/*" hidden>
-          </label>
+          <button type="button" id="sound-choose">{{ t("Choose sound …") }}</button>
           <button type="button" id="sound-play" class="ghost hidden">▶ {{ t("Play") }}</button>
-          <button type="button" id="sound-delete" class="ghost danger hidden">×</button>
+          <button type="button" id="sound-clear" class="ghost danger hidden"
+                  data-tip="{{ t('Make this area silent again. The sound stays in the library.') }}">×</button>
         </div>
         <p id="sound-name" class="muted hint">{{ t("No sound yet — the area stays silent.") }}</p>
         <audio id="sound-player" hidden></audio>
       </div>
 
-      <button type="button" id="area-delete" class="ghost danger">{{ t("Delete area") }}</button>
+      <div class="row">
+        <button type="button" id="area-duplicate" class="ghost"
+                data-tip="{{ t('Same shape and size once more — for a second animal of the same kind.') }}">{{ t("Duplicate") }}</button>
+        <button type="button" id="area-delete" class="ghost danger">{{ t("Delete area") }}</button>
+      </div>
     </div>
 
     <div class="drawer">
@@ -112,13 +124,79 @@
   </section>
 </div>
 
+<div id="sound-modal" class="modal hidden">
+  <div class="modal-inner sound-picker">
+    <div class="row modal-head">
+      <strong>{{ t("Sounds") }}</strong>
+      <button type="button" class="ghost" id="sound-modal-close" aria-label="{{ t('Close') }}">×</button>
+    </div>
+
+    <div class="cmdgroup sound-tabs">
+      <button type="button" class="tab active" data-tab="library">{{ t("Library") }}</button>
+      <button type="button" class="tab" data-tab="record">{{ t("Record") }}</button>
+      <button type="button" class="tab" data-tab="speak">{{ t("Let it speak") }}</button>
+      <button type="button" class="tab" data-tab="upload">{{ t("File") }}</button>
+    </div>
+
+    <div class="sound-panel" data-panel="library">
+      <p class="muted hint">{{ t("Every sound of this book. One sound can play in several places.") }}</p>
+      <div id="sound-list" class="sound-list"></div>
+    </div>
+
+    <div class="sound-panel hidden" data-panel="record">
+      <p class="muted hint">
+        {{ t("Speak into the microphone of this computer. Recording needs an https address or localhost — browsers do not allow it otherwise.") }}
+      </p>
+      <div class="row">
+        <button type="button" id="record-start">● {{ t("Start recording") }}</button>
+        <button type="button" id="record-stop" class="ghost hidden">■ {{ t("Stop") }}</button>
+        <span id="record-time" class="muted"></span>
+      </div>
+      <audio id="record-preview" controls class="hidden preview-player"></audio>
+      <div class="row hidden" id="record-actions">
+        <input type="text" id="record-name" placeholder="{{ t('Name of the sound') }}" autocomplete="off">
+        <button type="button" id="record-keep">{{ t("Keep") }}</button>
+        <button type="button" id="record-discard" class="ghost">{{ t("Discard") }}</button>
+      </div>
+      <p id="record-error" class="note hidden"></p>
+    </div>
+
+    <div class="sound-panel hidden" data-panel="speak">
+      <p class="muted hint">{{ t("Write what should be said and the computer speaks it. Good for labels and instructions.") }}</p>
+      <textarea id="speak-text" rows="3" placeholder="{{ t('The dog says woof.') }}"></textarea>
+      <div class="row">
+        <select id="speak-language"></select>
+        <button type="button" id="speak-go">{{ t("Speak it") }}</button>
+      </div>
+      <p id="speak-error" class="note hidden"></p>
+    </div>
+
+    <div class="sound-panel hidden" data-panel="upload">
+      <p class="muted hint">{{ t("Any audio file — it is converted to what the pen needs and levelled in volume.") }}</p>
+      <label class="button file-button">
+        {{ t("Choose file …") }}
+        <input type="file" id="sound-upload" accept="audio/*" hidden>
+      </label>
+    </div>
+  </div>
+</div>
+
 <script id="book-data" type="application/json">{{ book.to_dict() | tojson }}</script>
 <script id="book-strings" type="application/json">{{ js_strings | tojson }}</script>
 <div id="book-urls"
      data-save="{{ url_for('book_data', name=project.name) }}"
      data-image="{{ url_for('upload_page_image', name=project.name, page_id='PAGE') }}"
-     data-sound="{{ url_for('upload_area_sound', name=project.name, area_id='AREA') }}"
-     data-sound-delete="{{ url_for('delete_area_sound', name=project.name, area_id='AREA') }}"
+     data-sound-assign="{{ url_for('assign_area_sound', name=project.name, area_id='AREA') }}"
+     data-sounds="{{ url_for('list_sounds', name=project.name) }}"
+     data-sound-add="{{ url_for('add_sound', name=project.name) }}"
+     data-sound-speak="{{ url_for('speak_sound', name=project.name) }}"
+     data-sound-rename="{{ url_for('rename_sound', name=project.name, sound_id='SOUND') }}"
+     data-sound-delete="{{ url_for('delete_sound', name=project.name, sound_id='SOUND') }}"
+     data-area-duplicate="{{ url_for('duplicate_area', name=project.name, area_id='AREA') }}"
+     data-page-add="{{ url_for('add_page', name=project.name) }}"
+     data-page-duplicate="{{ url_for('duplicate_page', name=project.name, page_id='PAGE') }}"
+     data-page-delete="{{ url_for('delete_page', name=project.name, page_id='PAGE') }}"
+     data-page-move="{{ url_for('move_page', name=project.name, page_id='PAGE') }}"
      data-build="{{ url_for('build_book', name=project.name) }}"
      data-raw="{{ url_for('raw', name=project.name, path='PATH') }}"
      hidden></div>
@@ -126,5 +204,6 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='app.js') }}"></script>
+<script src="{{ url_for('static', filename='sounds.js') }}"></script>
 <script src="{{ url_for('static', filename='book.js') }}"></script>
 {% endblock %}

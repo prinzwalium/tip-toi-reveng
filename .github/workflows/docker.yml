@@ -174,9 +174,15 @@ jobs:
           curl -fsS -o /dev/null -X PUT http://127.0.0.1:8080/b/ci-buch/data \
             -H 'Content-Type: application/json' \
             -d '{"title":"CI Buch","product_id":42,"paper":"a4-landscape","pages":[{"id":"s1","name":"Seite 1","image":"","areas":[{"id":"a1","name":"Hund","x":20,"y":20,"w":40,"h":30}]}]}'
-          docker cp tttool-web:/app/examples/example/hello.ogg /tmp/hello.ogg
-          curl -fsS -o /dev/null -X POST -F sound=@/tmp/hello.ogg \
-            http://127.0.0.1:8080/b/ci-buch/areas/a1/sound
+          # A spoken sound exercises the synthesizer, ffmpeg and the loudness
+          # filter together — the whole audio path of the image.
+          spoken=$(curl -fsS -X POST http://127.0.0.1:8080/b/ci-buch/sounds/speak \
+            --data-urlencode 'text=Der Hund macht wau.' --data 'language=de')
+          echo "$spoken"
+          echo "$spoken" | grep -q '"ok":true'
+          sound_id=$(echo "$spoken" | sed -n 's/.*"sound": *"\([^"]*\)".*/\1/p')
+          curl -fsS -o /dev/null -X POST \
+            --data "sound_id=$sound_id" http://127.0.0.1:8080/b/ci-buch/areas/a1/sound
           result=$(curl -fsS -X POST http://127.0.0.1:8080/b/ci-buch/build)
           echo "$result"
           echo "$result" | grep -q '"ok":true'

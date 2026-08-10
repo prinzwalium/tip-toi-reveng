@@ -50,6 +50,16 @@ elif command == "--help" or not command:
     print("tttool-1.11 -- The swiss army knife for the Tiptoi hacker")
 '''
 
+PICO_STUB = """#!/bin/sh
+# Stand-in for pico2wave: writes a file where --wave points.
+prev=""; wave=""
+for arg in "$@"; do
+  [ "$prev" = "--wave" ] && wave="$arg"
+  prev="$arg"
+done
+printf 'RIFFfake' > "$wave"
+"""
+
 FFMPEG_STUB = """#!/bin/sh
 # Copies the input to the output; enough to test the upload path.
 prev=""; input=""; last=""
@@ -71,10 +81,14 @@ def client(tmp_path, monkeypatch):
     ffmpeg = tmp_path / "ffmpeg-stub"
     ffmpeg.write_text(FFMPEG_STUB)
     ffmpeg.chmod(0o755)
+    pico = tmp_path / "pico-stub"
+    pico.write_text(PICO_STUB)
+    pico.chmod(0o755)
 
     monkeypatch.setenv("TTTOOL_WEB_DATA", str(data))
     monkeypatch.setenv("TTTOOL_BIN", str(tttool))
     monkeypatch.setenv("FFMPEG_BIN", str(ffmpeg))
+    monkeypatch.setenv("PICO_BIN", str(pico))
     monkeypatch.setenv("TTTOOL_WEB_LANG", "en")
     for module in [m for m in list(sys.modules) if m.startswith("tttool_web")]:
         del sys.modules[module]
@@ -101,10 +115,15 @@ def put_areas(client, name, areas, paper="a4-landscape"):
 
 
 def add_sound(client, name, area_id, filename="bark.mp3"):
-    return client.post(
-        f"/b/{name}/areas/{area_id}/sound",
+    """Put a sound in the library and let ``area_id`` play it."""
+    added = client.post(
+        f"/b/{name}/sounds/add",
         data={"sound": (io.BytesIO(b"audio"), filename)},
         content_type="multipart/form-data",
+    ).get_json()
+    assert added.get("ok"), added
+    return client.post(
+        f"/b/{name}/areas/{area_id}/sound", data={"sound_id": added["sound"]}
     )
 
 
@@ -156,21 +175,28 @@ def test_browser_cannot_point_an_area_at_another_file(client):
     """Sound and picture paths come from the server, never from the client."""
     name = make_book(client)
     put_areas(client, name, [{"id": "a1", "name": "X", "x": 10, "y": 10, "w": 30, "h": 20,
-                              "sound": "../../../etc/passwd"}])
+                              "sound": "../../../etc/passwd", "sound_id": "../../etc/passwd"}])
     area = json.loads((client.data_dir / name / "book.json").read_text())["pages"][0]["areas"][0]
-    assert area["sound"] == ""
+    assert area["sound_id"] == ""
+    assert "sound" not in area
 
 
-def test_sound_upload_is_converted_and_linked(client):
+def test_sound_upload_lands_in_the_library_and_is_assigned(client):
     name = make_book(client)
     put_areas(client, name, [{"id": "a1", "name": "Hund", "x": 10, "y": 10, "w": 40, "h": 30}])
     result = add_sound(client, name, "a1").get_json()
     assert result["ok"]
-    assert result["sound"] == "sounds/a1.ogg"
-    assert result["sound_name"] == "bark.mp3"
-    assert (client.data_dir / name / "sounds" / "a1.ogg").is_file()
-    # the upload itself is not kept
-    assert not list((client.data_dir / name / "sounds").glob("*-original*"))
+    book = json.loads((client.data_dir / name / "book.json").read_text())
+    assert len(book["sounds"]) == 1
+    sound = book["sounds"][0]
+    assert sound["name"] == "bark"
+    assert sound["file"] == f"sounds/{sound['id']}.ogg"
+    assert book["pages"][0]["areas"][0]["sound_id"] == sound["id"]
+    assert (client.data_dir / name / sound["file"]).is_file()
+    # only the converted file is kept
+    assert list((client.data_dir / name / "sounds").iterdir()) == [
+        client.data_dir / name / sound["file"]
+    ]
 
 
 def test_page_picture_upload(client):
@@ -260,8 +286,8 @@ def test_generated_yaml_is_derived_from_the_book(client, built):
     name, _ = built
     yaml = (client.data_dir / name / "book.yaml").read_text()
     assert 'media-path: "sounds/%s"' in yaml
-    assert "s1_a1: P(a1)" in yaml
-    assert "s1_a2: P(a2)" in yaml
+    assert "s1_a1: P(t1)" in yaml
+    assert "s1_a2: P(t2)" in yaml
 
 
 def test_printed_page_has_the_right_physical_size(client, built):
@@ -292,3 +318,291 @@ def test_codes_stay_the_same_when_the_book_is_built_again(client, built):
     name, first = built
     second = client.post(f"/b/{name}/build").get_json()
     assert first["codes"] == second["codes"]
+
+
+def test_build_offers_a_test_page(client, built):
+    name, result = built
+    assert result["test_pdf"].endswith("druckprobe.pdf")
+    assert (client.data_dir / name / result["test_pdf"]).is_file()
+    svg = (client.data_dir / name / "druck" / "druckprobe.svg").read_text()
+    # every offered size, so the user can find their printer's limit
+    for size in (8, 10, 12, 15, 20):
+        assert f">{size} mm<" in svg
+    assert "100%" in svg
+
+
+# -- several pages ----------------------------------------------------------
+
+
+def test_pages_can_be_added_duplicated_moved_and_deleted(client):
+    name = make_book(client)
+    put_areas(client, name, [{"id": "a1", "name": "Hund", "x": 10, "y": 10, "w": 40, "h": 30}])
+    add_sound(client, name, "a1")
+
+    added = client.post(f"/b/{name}/pages").get_json()
+    assert len(added["book"]["pages"]) == 2
+
+    duplicated = client.post(f"/b/{name}/pages/s1/duplicate").get_json()
+    pages = duplicated["book"]["pages"]
+    assert len(pages) == 3
+    copy = pages[1]
+    assert copy["image"] == pages[0]["image"]
+    assert [a["name"] for a in copy["areas"]] == ["Hund"]
+    assert copy["areas"][0]["sound_id"] == pages[0]["areas"][0]["sound_id"]
+    assert copy["areas"][0]["id"] != "a1"
+
+    moved = client.post(f"/b/{name}/pages/s1/move", data={"direction": "down"}).get_json()
+    assert [p["id"] for p in moved["book"]["pages"]][0] != "s1"
+
+    deleted = client.post(f"/b/{name}/pages/s1/delete").get_json()
+    assert "s1" not in [p["id"] for p in deleted["book"]["pages"]]
+
+
+def test_the_last_page_cannot_be_deleted(client):
+    name = make_book(client)
+    response = client.post(f"/b/{name}/pages/s1/delete")
+    assert response.status_code == 400
+    assert "at least one page" in response.get_json()["error"]
+
+
+def test_every_page_gets_its_own_printed_sheet(client):
+    name = make_book(client, "Zwei Seiten")
+    put_areas(client, name, [{"id": "a1", "name": "Hund", "x": 10, "y": 10, "w": 40, "h": 30}])
+    add_sound(client, name, "a1")
+    client.post(f"/b/{name}/pages/s1/duplicate")
+    book = client.get(f"/b/{name}/data").get_json()
+    second = book["pages"][1]
+    second["areas"][0]["name"] = "Katze"
+    client.put(f"/b/{name}/data", json=book)
+
+    result = client.post(f"/b/{name}/build").get_json()
+    assert result["ok"], result
+    assert len(result["pages"]) == 2
+    assert {entry["area"] for entry in result["codes"]} == {"Hund", "Katze"}
+    # two different codes, so the pen can tell the pages apart
+    assert len({entry["code"] for entry in result["codes"]}) == 2
+
+    from pypdf import PdfReader
+
+    assert len(PdfReader(str(client.data_dir / name / result["pdf"])).pages) == 2
+
+
+# -- free shapes ------------------------------------------------------------
+
+
+def test_a_polygon_is_stored_with_its_bounding_box(client):
+    name = make_book(client)
+    put_areas(
+        client,
+        name,
+        [{"id": "a1", "name": "See", "kind": "poly",
+          "points": [[20, 30], [60, 25], [70, 60], [30, 70]]}],
+    )
+    area = json.loads((client.data_dir / name / "book.json").read_text())["pages"][0]["areas"][0]
+    assert area["kind"] == "poly"
+    assert area["x"] == 20 and area["y"] == 25
+    assert area["w"] == 50 and area["h"] == 45
+
+
+def test_a_polygon_is_printed_as_a_polygon(client):
+    name = make_book(client)
+    put_areas(
+        client,
+        name,
+        [{"id": "a1", "name": "See", "kind": "poly",
+          "points": [[20, 30], [60, 25], [70, 60], [30, 70]]}],
+    )
+    add_sound(client, name, "a1")
+    result = client.post(f"/b/{name}/build").get_json()
+    assert result["ok"], result
+    svg = (client.data_dir / name / "druck" / "seite-1.svg").read_text()
+    assert '<polygon points="960.0,1440.0' in svg  # 20 mm * 48 units, 30 mm * 48
+    assert 'fill="url(#oid-s1_a1)"' in svg
+
+
+def test_a_polygon_with_too_few_corners_falls_back_to_a_rectangle(client):
+    name = make_book(client)
+    put_areas(client, name, [{"id": "a1", "kind": "poly", "points": [[10, 10], [20, 20]],
+                              "x": 10, "y": 10, "w": 30, "h": 20}])
+    area = json.loads((client.data_dir / name / "book.json").read_text())["pages"][0]["areas"][0]
+    assert area["kind"] == "rect"
+
+
+# -- duplicating areas ------------------------------------------------------
+
+
+def test_duplicating_an_area_keeps_shape_and_sound(client):
+    name = make_book(client)
+    put_areas(client, name, [{"id": "a1", "name": "Hund", "x": 10, "y": 10, "w": 40, "h": 30}])
+    add_sound(client, name, "a1")
+    result = client.post(f"/b/{name}/areas/a1/duplicate").get_json()
+    areas = result["book"]["pages"][0]["areas"]
+    assert len(areas) == 2
+    copy = areas[1]
+    assert copy["w"] == 40 and copy["h"] == 30
+    # the library makes sharing a sound the natural thing
+    assert copy["sound_id"] == areas[0]["sound_id"]
+    assert copy["id"] != "a1"
+
+
+# -- dark artwork -----------------------------------------------------------
+
+
+def test_dark_artwork_under_an_area_is_flagged(client):
+    pytest.importorskip("PIL")
+    from PIL import Image
+
+    name = make_book(client)
+    dark = Image.new("RGB", (600, 400), (12, 12, 14))
+    buffer = io.BytesIO()
+    dark.save(buffer, format="PNG")
+    buffer.seek(0)
+    client.post(
+        f"/b/{name}/pages/s1/image",
+        data={"image": (buffer, "dunkel.png")},
+        content_type="multipart/form-data",
+    )
+    put_areas(client, name, [{"id": "a1", "name": "Nacht", "x": 60, "y": 40, "w": 40, "h": 30}])
+    add_sound(client, name, "a1")
+    hints = client.post(f"/b/{name}/build").get_json()["hints"]
+    assert any("dark part" in hint for hint in hints)
+
+
+# -- the sound library ------------------------------------------------------
+
+
+def test_one_sound_can_be_used_by_several_areas(client):
+    name = make_book(client)
+    put_areas(
+        client,
+        name,
+        [
+            {"id": "a1", "name": "Hund", "x": 10, "y": 10, "w": 40, "h": 30},
+            {"id": "a2", "name": "Zweiter Hund", "x": 80, "y": 10, "w": 40, "h": 30},
+        ],
+    )
+    added = client.post(
+        f"/b/{name}/sounds/add",
+        data={"sound": (io.BytesIO(b"audio"), "wau.mp3")},
+        content_type="multipart/form-data",
+    ).get_json()
+    for area in ("a1", "a2"):
+        client.post(f"/b/{name}/areas/{area}/sound", data={"sound_id": added["sound"]})
+
+    library = client.get(f"/b/{name}/sounds").get_json()
+    assert len(library["sounds"]) == 1
+    assert library["sounds"][0]["used"] == 2
+
+    result = client.post(f"/b/{name}/build").get_json()
+    assert result["ok"], result
+    yaml = (client.data_dir / name / "book.yaml").read_text()
+    assert yaml.count(f"P({added['sound']})") == 2
+    # two areas, two codes, one sound file
+    assert len(result["codes"]) == 2
+    assert len(list((client.data_dir / name / "sounds").iterdir())) == 1
+
+
+def test_deleting_a_sound_silences_the_areas_that_used_it(client):
+    name = make_book(client)
+    put_areas(client, name, [{"id": "a1", "name": "Hund", "x": 10, "y": 10, "w": 40, "h": 30}])
+    add_sound(client, name, "a1")
+    book = client.get(f"/b/{name}/data").get_json()
+    sound_id = book["sounds"][0]["id"]
+
+    result = client.post(f"/b/{name}/sounds/{sound_id}/delete").get_json()
+    assert result["book"]["pages"][0]["areas"][0]["sound_id"] == ""
+    assert result["sounds"] == []
+    assert not (client.data_dir / name / "sounds" / f"{sound_id}.ogg").exists()
+
+
+def test_a_sound_can_be_renamed(client):
+    name = make_book(client)
+    add_sound(client, name, "a1") if False else None
+    added = client.post(
+        f"/b/{name}/sounds/add",
+        data={"sound": (io.BytesIO(b"audio"), "irgendwas.mp3")},
+        content_type="multipart/form-data",
+    ).get_json()
+    result = client.post(
+        f"/b/{name}/sounds/{added['sound']}/rename", data={"name": "Hund bellt"}
+    ).get_json()
+    assert result["sounds"][0]["name"] == "Hund bellt"
+
+
+def test_assigning_an_unknown_sound_is_refused(client):
+    name = make_book(client)
+    put_areas(client, name, [{"id": "a1", "name": "Hund", "x": 10, "y": 10, "w": 40, "h": 30}])
+    response = client.post(f"/b/{name}/areas/a1/sound", data={"sound_id": "nope"})
+    assert response.status_code == 400
+
+
+def test_a_book_from_the_previous_format_gains_a_library(client):
+    """Books made with 1.1/1.2 keep working and get their sounds migrated."""
+    name = make_book(client)
+    old = {
+        "title": "Alt", "product_id": 42, "paper": "a4-landscape", "version": 1,
+        "pages": [{"id": "s1", "name": "Seite 1", "image": "", "areas": [
+            {"id": "a1", "name": "Hund", "x": 10, "y": 10, "w": 40, "h": 30,
+             "sound": "sounds/a1.ogg", "sound_name": "wau.mp3"},
+            {"id": "a2", "name": "Auch Hund", "x": 80, "y": 10, "w": 40, "h": 30,
+             "sound": "sounds/a1.ogg", "sound_name": "wau.mp3"},
+        ]}],
+    }
+    (client.data_dir / name / "book.json").write_text(json.dumps(old))
+    (client.data_dir / name / "sounds").mkdir(exist_ok=True)
+    (client.data_dir / name / "sounds" / "a1.ogg").write_bytes(b"ogg")
+
+    book = client.get(f"/b/{name}/data").get_json()
+    assert book["version"] == 2
+    assert len(book["sounds"]) == 1
+    sound = book["sounds"][0]
+    assert sound["file"] == "sounds/a1.ogg"
+    assert sound["name"] == "wau.mp3"
+    # both areas end up on the same library entry
+    assert [a["sound_id"] for a in book["pages"][0]["areas"]] == [sound["id"], sound["id"]]
+
+
+# -- spoken sounds ----------------------------------------------------------
+
+
+def test_speaking_creates_a_sound_that_can_be_spoken_again(client, monkeypatch):
+    name = make_book(client)
+    result = client.post(
+        f"/b/{name}/sounds/speak", data={"text": "Der Hund macht wau.", "language": "de"}
+    ).get_json()
+    assert result["ok"], result
+    assert result["engine"] == "pico"
+    sound = [s for s in result["sounds"] if s["id"] == result["sound"]][0]
+    assert sound["source"] == "speak"
+    assert sound["text"] == "Der Hund macht wau."
+    assert sound["language"] == "de"
+    assert (client.data_dir / name / sound["file"]).is_file()
+
+    # Speaking again replaces the file, so every area follows along.
+    again = client.post(
+        f"/b/{name}/sounds/speak",
+        data={"text": "Die Katze macht miau.", "language": "de", "sound_id": sound["id"]},
+    ).get_json()
+    assert len(again["sounds"]) == 1
+    assert again["sounds"][0]["text"] == "Die Katze macht miau."
+
+
+def test_speaking_needs_text(client):
+    name = make_book(client)
+    response = client.post(f"/b/{name}/sounds/speak", data={"text": "   ", "language": "de"})
+    assert response.status_code == 400
+
+
+def test_without_a_synthesizer_speaking_says_so(client, monkeypatch):
+    monkeypatch.setenv("PICO_BIN", "definitely-not-installed")
+    monkeypatch.setenv("ESPEAK_BIN", "definitely-not-installed-either")
+    for module in [m for m in list(sys.modules) if m.startswith("tttool_web")]:
+        del sys.modules[module]
+    from tttool_web.app import create_app
+
+    with create_app().test_client() as fresh:
+        fresh.post("/books", data={"title": "Stumm"})
+        assert fresh.get("/b/stumm/sounds").get_json()["can_speak"] is False
+        response = fresh.post("/b/stumm/sounds/speak", data={"text": "Hallo"})
+        assert response.status_code == 400
+        assert "speech synthesizer" in response.get_json()["error"]

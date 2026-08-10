@@ -7,6 +7,46 @@ YYYY-MM-DD.
 Unreleased
 ----------
 
+1.3.0 — sound without fuss
+--------------------------
+
+Milestone 3 of `ROADMAP.md`. A book can now be made without any audio software
+at all.
+
+* **A sound library per book.** Sounds are no longer stuck to one area: the
+  same “wau” can play on every dog in the book, is renamed in one place, and
+  shows how often it is used before you delete it.
+* **Record with the microphone** straight in the browser: record, listen, keep
+  or discard. (Browsers only allow this over `https://` or on `localhost` —
+  the dialog says so.)
+* **Let the computer speak**: type a sentence, pick a language, and the sound
+  is synthesized with the voice already in the container. Speaking it again
+  replaces the file, so every area that uses it follows along.
+* **Volume levelling** (EBU R128) for everything that comes in, so a phone
+  recording and a studio file are equally usable on the pen's small speaker.
+* Books written by 1.1 and 1.2 are migrated automatically: their sounds move
+  into the library, and areas that shared a file end up sharing one entry.
+
+1.2.0 — books that are actually books
+-------------------------------------
+
+Milestone 2 of `ROADMAP.md`.
+
+* **Several pages per book**: add, rename, duplicate, reorder and delete pages;
+  every page gets its own picture and its own printed sheet, and they are bound
+  into one PDF.
+* **Free shapes**: an area no longer has to be a rectangle. Click the corners
+  of a lake or an animal and close the outline by clicking the first corner
+  again; the corners can be dragged afterwards. Printed as a polygon, so the
+  dots stop exactly where the shape does.
+* **Print test page** (*Druckprobe*): the same code printed at 8, 10, 12, 15,
+  20 and 30 mm, with the power-on field and instructions. Tap the squares with
+  the pen and the smallest one that answers is the smallest area your printer
+  can do. It is offered before the book itself.
+* **Dark artwork is flagged**: areas sitting on a dark part of the picture are
+  pointed out before printing, because the pen cannot read dots there.
+* **Duplicate an area** with the same shape and size.
+
 1.1.0 — the book editor
 -----------------------
 

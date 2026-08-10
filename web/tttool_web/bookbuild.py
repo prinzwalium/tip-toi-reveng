@@ -43,6 +43,7 @@ class BuildResult:
     ok: bool
     gme: str = ""
     pdf: str = ""
+    test_pdf: str = ""
     pages: list[str] = None
     codes: list[tuple[str, str, int]] = None  # (page, area, code)
     problems: list[str] = None
@@ -54,6 +55,7 @@ class BuildResult:
             "ok": self.ok,
             "gme": self.gme,
             "pdf": self.pdf,
+            "test_pdf": self.test_pdf,
             "pages": self.pages or [],
             "codes": [{"page": p, "area": a, "code": c} for p, a, c in (self.codes or [])],
             "problems": self.problems or [],
@@ -77,10 +79,11 @@ def write_yaml(project: Project, book: Book) -> str:
     ]
     for page in book.pages:
         for area in page.areas:
-            if not area.sound:
+            if not area.sound_id:
                 continue
-            stem = Path(area.sound).stem
-            lines.append(f"  {book.script_name(page, area)}: P({stem})")
+            # The library file is sounds/<sound id>.ogg, and media-path adds
+            # the folder and the extension.
+            lines.append(f"  {book.script_name(page, area)}: P({area.sound_id})")
     text = "\n".join(lines) + "\n"
     return project.write_text(YAML_FILE, text)
 
@@ -129,6 +132,17 @@ def _codes_from_yaml(project: Project, book: Book) -> dict[str, int]:
 # --------------------------------------------------------------- the pages
 
 
+def _shape(area, fill: str, u: int, extra: str = "") -> str:
+    """A painted area as SVG — a rectangle or the polygon the user drew."""
+    if area.is_polygon:
+        points = " ".join(f"{px * u:.1f},{py * u:.1f}" for px, py in area.points)
+        return f'<polygon points="{points}" fill="{fill}"{extra}/>'
+    return (
+        f'<rect x="{area.x * u:.1f}" y="{area.y * u:.1f}" '
+        f'width="{area.w * u:.1f}" height="{area.h * u:.1f}" fill="{fill}"{extra}/>'
+    )
+
+
 def compose_page_svg(project: Project, book: Book, page: Page, patterns: dict[str, str]) -> str:
     """One printable page: picture, painted areas, power-on field."""
     page_w, page_h = book.page_size
@@ -137,7 +151,7 @@ def compose_page_svg(project: Project, book: Book, page: Page, patterns: dict[st
     used = {
         book.script_name(page, area): area
         for area in page.areas
-        if area.sound and book.script_name(page, area) in patterns
+        if area.sound_id and book.script_name(page, area) in patterns
     }
     defs = "".join(patterns[name] for name in used)
     if "START" in patterns:
@@ -156,10 +170,7 @@ def compose_page_svg(project: Project, book: Book, page: Page, patterns: dict[st
             )
 
     for name, area in used.items():
-        body.append(
-            f'<rect x="{area.x * u:.1f}" y="{area.y * u:.1f}" '
-            f'width="{area.w * u:.1f}" height="{area.h * u:.1f}" fill="url(#oid-{name})"/>'
-        )
+        body.append(_shape(area, f"url(#oid-{name})", u))
 
     # The power-on field, on every page — without it the pen stays silent.
     px, py, pw, ph = book.power_field
@@ -178,17 +189,86 @@ def compose_page_svg(project: Project, book: Book, page: Page, patterns: dict[st
         )
 
     # A printed ruler mark: if this is not exactly 50 mm, the print was scaled.
-    ruler_y = page_h - 4
-    body.append(
+    body.append(_ruler_svg(page_w, page_h, u))
+
+    return _svg_document(page_w, page_h, u, defs, body)
+
+
+#: Sizes offered on the test page, in millimetres.
+TEST_SIZES = (8, 10, 12, 15, 20, 30)
+
+
+def compose_test_svg(book: Book, patterns: dict[str, str], sample: str) -> str:
+    """A page to print before the book: does this printer produce readable dots?
+
+    The same code is drawn at several sizes, so the user finds out what their
+    printer manages — and the ruler mark tells them whether the print was
+    scaled, which is the mistake that silently ruins everything else.
+    """
+    page_w, page_h = book.page_size
+    u = UNITS_PER_MM
+    defs = "".join(patterns[name] for name in {sample, "START"} if name in patterns)
+
+    def text(x, y, size, content, weight="normal"):
+        return (
+            f'<text x="{x * u:.1f}" y="{y * u:.1f}" font-family="{FONT}" '
+            f'font-size="{size * u}" font-weight="{weight}" fill="black">{escape(content)}</text>'
+        )
+
+    body = [
+        text(15, 20, 6, t("Print test"), "bold"),
+        text(15, 27, 3.4, t("1. Print this page at 100% — never “fit to page”.")),
+        text(15, 32, 3.4, t("2. Check the 50 mm line below with a ruler.")),
+        text(15, 37, 3.4, t("3. Switch the pen on with the field on the left.")),
+        text(15, 42, 3.4, t("4. Tap the squares. The smallest one that answers is your minimum size.")),
+    ]
+
+    # The power-on field, so the pen can be switched on from this page alone.
+    px, py = 15.0, 52.0
+    if "START" in patterns:
+        body.append(
+            f'<rect x="{px * u}" y="{py * u}" width="{20 * u}" height="{20 * u}" fill="white"/>'
+            f'<rect x="{px * u}" y="{py * u}" width="{20 * u}" height="{20 * u}" '
+            f'fill="url(#oid-START)"/>'
+            f'<rect x="{px * u}" y="{py * u}" width="{20 * u}" height="{20 * u}" '
+            f'fill="none" stroke="black" stroke-width="{0.3 * u}"/>'
+        )
+        body.append(text(px, py - 2, 3.2, t("Tap here to switch on")))
+
+    if sample in patterns:
+        x = px + 30.0
+        for size in TEST_SIZES:
+            if x + size > page_w - 15:
+                break
+            y = py + 20 - size
+            body.append(
+                f'<rect x="{x * u}" y="{y * u}" width="{size * u}" height="{size * u}" '
+                f'fill="url(#oid-{sample})"/>'
+                f'<rect x="{x * u}" y="{y * u}" width="{size * u}" height="{size * u}" '
+                f'fill="none" stroke="black" stroke-width="{0.2 * u}"/>'
+            )
+            body.append(text(x, py + 24, 3.2, f"{size} mm"))
+            x += size + 8
+
+    body.append(_ruler_svg(page_w, page_h, u))
+    return _svg_document(page_w, page_h, u, defs, body)
+
+
+def _ruler_svg(page_w: float, page_h: float, u: int) -> str:
+    """A 50 mm line: if it does not measure 50 mm, the print was scaled."""
+    y = page_h - 4
+    return (
         f'<g stroke="black" stroke-width="{0.25 * u}">'
-        f'<line x1="{(page_w - 58) * u}" y1="{ruler_y * u}" x2="{(page_w - 8) * u}" y2="{ruler_y * u}"/>'
-        f'<line x1="{(page_w - 58) * u}" y1="{(ruler_y - 1.5) * u}" x2="{(page_w - 58) * u}" y2="{(ruler_y + 1.5) * u}"/>'
-        f'<line x1="{(page_w - 8) * u}" y1="{(ruler_y - 1.5) * u}" x2="{(page_w - 8) * u}" y2="{(ruler_y + 1.5) * u}"/>'
+        f'<line x1="{(page_w - 58) * u}" y1="{y * u}" x2="{(page_w - 8) * u}" y2="{y * u}"/>'
+        f'<line x1="{(page_w - 58) * u}" y1="{(y - 1.5) * u}" x2="{(page_w - 58) * u}" y2="{(y + 1.5) * u}"/>'
+        f'<line x1="{(page_w - 8) * u}" y1="{(y - 1.5) * u}" x2="{(page_w - 8) * u}" y2="{(y + 1.5) * u}"/>'
         f"</g>"
-        f'<text x="{(page_w - 58) * u}" y="{(ruler_y - 2.5) * u}" font-family="{FONT}" '
+        f'<text x="{(page_w - 58) * u}" y="{(y - 2.5) * u}" font-family="{FONT}" '
         f'font-size="{2.8 * u}" fill="black">{escape(t("50 mm — check with a ruler"))}</text>'
     )
 
+
+def _svg_document(page_w: float, page_h: float, u: int, defs: str, body: list[str]) -> str:
     return (
         f'<?xml version="1.0" encoding="UTF-8"?>\n'
         f'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" '
@@ -280,20 +360,35 @@ def build(project: Project, book: Book) -> BuildResult:
         page_files.append(project.relpath_of(pdf_path))
         for area in page.areas:
             name = book.script_name(page, area)
-            if area.sound and name in code_numbers:
+            if area.sound_id and name in code_numbers:
                 codes.append((page.name or page.id, area.name or area.id, code_numbers[name]))
 
     book_pdf = print_dir / f"{_slug(book.title)}.pdf"
     _merge_pdfs(pdf_parts, book_pdf)
 
+    # The test page: the same code at several sizes, to try the printer with.
+    test_pdf = ""
+    sample = next(
+        (book.script_name(p, a) for p in book.pages for a in p.areas if a.sound_id), ""
+    )
+    if sample:
+        test_svg = print_dir / "druckprobe.svg"
+        test_svg.write_text(compose_test_svg(book, patterns, sample), encoding="utf-8")
+        try:
+            _svg_to_pdf(test_svg, print_dir / "druckprobe.pdf")
+            test_pdf = project.relpath_of(print_dir / "druckprobe.pdf")
+        except Exception:  # noqa: BLE001 — the book itself is already done
+            test_pdf = ""
+
     return BuildResult(
         ok=True,
         gme=GME_FILE,
         pdf=project.relpath_of(book_pdf),
+        test_pdf=test_pdf,
         pages=page_files,
         codes=codes,
         problems=[],
-        hints=hints,
+        hints=hints + book.dark_area_hints(project),
         log="\n".join(log),
     )
 

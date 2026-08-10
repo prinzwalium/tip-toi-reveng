@@ -244,14 +244,37 @@ table.list tr:hover td { background: var(--bg); }
 .page-canvas .area.silent rect { fill: rgba(154, 103, 0, .16); stroke: var(--warn); stroke-dasharray: 2 1.5; }
 .page-canvas .area text { font-size: 4px; fill: #12304f; paint-order: stroke; stroke: #fff; stroke-width: 1.2; dominant-baseline: middle; }
 .page-canvas .area.selected rect { stroke-width: 1; }
+.page-canvas .area polygon { fill: rgba(31, 111, 235, .18); stroke: var(--accent); stroke-width: .5; }
+.page-canvas .area.silent polygon { fill: rgba(154, 103, 0, .16); stroke: var(--warn); stroke-dasharray: 2 1.5; }
 .page-canvas .area .handle { fill: var(--accent); stroke: #fff; stroke-width: .4; cursor: nwse-resize; }
+.page-canvas .area circle.handle { cursor: move; }
 .page-canvas .area { cursor: move; }
+.page-canvas .drawing { fill: rgba(31, 111, 235, .12); stroke: var(--accent); stroke-width: .5; stroke-dasharray: 2 1; }
+.page-canvas .drawing-point { fill: var(--accent); }
+input.page-name { width: 12em; flex: 0 0 auto; }
+button.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .page-canvas .power-field rect { fill: rgba(0,0,0,.06); stroke: #333; stroke-width: .4; stroke-dasharray: 2 1; }
 .page-canvas .power-field text { font-size: 4px; fill: #333; dominant-baseline: middle; }
 
 .book-side .drawer { margin-top: 18px; }
 .book-side h2 { margin-bottom: 10px; }
 .sound-box { border: 1px solid var(--line); border-radius: 8px; padding: 10px; width: 100%; }
+
+/* ---- sound picker ---- */
+
+.sound-picker { width: min(720px, 92vw); }
+.sound-tabs { margin-bottom: 14px; }
+.sound-panel > * + * { margin-top: 10px; }
+.sound-list { max-height: 50vh; overflow: auto; }
+.sound-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 0; border-bottom: 1px solid var(--line);
+}
+.sound-row:last-child { border-bottom: none; }
+.sound-row .sound-name-input { flex: 1; min-width: 8em; }
+.sound-row button { padding: 3px 10px; font-size: 13px; }
+.preview-player { width: 100%; }
+#speak-text { width: 100%; }
 .save-state { font-size: 12px; }
 .save-state.saving { color: var(--warn); }
 .save-state.failed { color: var(--err); }
