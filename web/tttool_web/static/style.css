@@ -226,6 +226,40 @@ table.list tr:hover td { background: var(--bg); }
 #preview-body img { max-width: 86vw; max-height: 74vh; image-rendering: pixelated; background: #fff; }
 #preview-body embed { width: 86vw; height: 74vh; }
 
+/* ---- book editor ---- */
+
+.book-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 1000px) { .book-layout { grid-template-columns: minmax(0, 1fr); } }
+
+.book-toolbar { margin-bottom: 12px; }
+.book-toolbar .grow { flex: 1; }
+.book-toolbar select { width: auto; }
+.file-button { display: inline-flex; align-items: center; cursor: pointer; }
+
+.stage { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; overflow: auto; }
+.page-canvas { display: block; width: 100%; height: auto; touch-action: none; background: #fff; box-shadow: 0 1px 6px rgba(0,0,0,.15); }
+.page-canvas .page-bg { fill: #fff; }
+
+.page-canvas .area rect { fill: rgba(31, 111, 235, .18); stroke: var(--accent); stroke-width: .5; }
+.page-canvas .area.silent rect { fill: rgba(154, 103, 0, .16); stroke: var(--warn); stroke-dasharray: 2 1.5; }
+.page-canvas .area text { font-size: 4px; fill: #12304f; paint-order: stroke; stroke: #fff; stroke-width: 1.2; dominant-baseline: middle; }
+.page-canvas .area.selected rect { stroke-width: 1; }
+.page-canvas .area .handle { fill: var(--accent); stroke: #fff; stroke-width: .4; cursor: nwse-resize; }
+.page-canvas .area { cursor: move; }
+.page-canvas .power-field rect { fill: rgba(0,0,0,.06); stroke: #333; stroke-width: .4; stroke-dasharray: 2 1; }
+.page-canvas .power-field text { font-size: 4px; fill: #333; dominant-baseline: middle; }
+
+.book-side .drawer { margin-top: 18px; }
+.book-side h2 { margin-bottom: 10px; }
+.sound-box { border: 1px solid var(--line); border-radius: 8px; padding: 10px; width: 100%; }
+.save-state { font-size: 12px; }
+.save-state.saving { color: var(--warn); }
+.save-state.failed { color: var(--err); }
+
+.build-result { margin-top: 12px; }
+.build-result .note.problem { border-left-color: var(--err); background: color-mix(in srgb, var(--err) 12%, transparent); }
+.build-step { margin: 8px 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
 /* ---- tooltips ---- */
 
 #tooltip {

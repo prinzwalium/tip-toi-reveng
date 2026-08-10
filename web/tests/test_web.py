@@ -60,6 +60,8 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("TTTOOL_BIN", str(stub))
     monkeypatch.setenv("FFMPEG_BIN", str(ffmpeg))
     monkeypatch.setenv("TTTOOL_WEB_EXAMPLES", str(examples))
+    # These tests assert on the source strings, not on a translation.
+    monkeypatch.setenv("TTTOOL_WEB_LANG", "en")
     for module in [m for m in list(sys.modules) if m.startswith("tttool_web")]:
         del sys.modules[module]
 
@@ -82,7 +84,7 @@ def make_project(client, name="book", **form):
 def test_index_empty(client):
     response = client.get("/")
     assert response.status_code == 200
-    assert b"No projects yet" in response.data
+    assert b"No books yet" in response.data
 
 
 def test_create_project_with_template(client):
@@ -355,6 +357,22 @@ def test_healthz(client):
     payload = client.get("/healthz").get_json()
     assert payload["status"] == "ok"
     assert payload["tttool"] == "1.11"
+    assert payload["version"]
+    assert payload["build"] == {"ref": "", "commit": ""}
+
+
+def test_build_stamp_is_reported(tmp_path, monkeypatch):
+    """Beta testers report the build id, so it has to reach both UI and API."""
+    monkeypatch.setenv("TTTOOL_WEB_DATA", str(tmp_path))
+    monkeypatch.setenv("TTTOOL_WEB_BUILD_REF", "beta")
+    monkeypatch.setenv("TTTOOL_WEB_BUILD_SHA", "a1b2c3d4e5f6")
+    for module in [m for m in list(sys.modules) if m.startswith("tttool_web")]:
+        del sys.modules[module]
+    from tttool_web.app import create_app
+
+    with create_app().test_client() as client:
+        assert client.get("/healthz").get_json()["build"] == {"ref": "beta", "commit": "a1b2c3d"}
+        assert "beta (a1b2c3d)" in client.get("/").data.decode()
 
 
 def test_help_page(client):

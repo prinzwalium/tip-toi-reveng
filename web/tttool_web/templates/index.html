@@ -1,54 +1,54 @@
 {% extends "base.html" %}
-{% block title %}Projects{% endblock %}
+{% block title %}{{ t("Books") }}{% endblock %}
 
 {% block content %}
 <section class="hero">
-  <h1>Tiptoi projects</h1>
+  <h1>{{ t("Your Tiptoi books") }}</h1>
   <p class="muted">
-    A project is a directory on the server. Upload your <code>.yaml</code> source and audio
-    files, or an existing <code>.gme</code> file, then run any tttool command on it.
+    {{ t("Make a book: upload a picture, draw areas on it, give each area a sound. You get a sheet to print and a file for the pen.") }}
   </p>
 </section>
 
 <section class="card">
-  <h2>New project</h2>
-  <form method="post" action="{{ url_for('create_project') }}" class="row">
-    <input name="name" placeholder="my-book" required pattern="[A-Za-z0-9][A-Za-z0-9._\-]{0,63}"
-           title="Letters, digits, dot, underscore and dash" autocomplete="off"
-           data-tip="Becomes the name of the directory on the server. Letters, digits, dot, underscore and dash.">
-    <label class="field compact"
-           data-tip="What the new project starts out with. You can upload your own files either way.">
-      <span class="label">Start from</span>
-      <select name="start">
-        <option value="template">a minimal book.yaml</option>
-        {% if examples %}<option value="example">the example book (with audio)</option>{% endif %}
-        <option value="empty">nothing (I have files to upload)</option>
+  <h2>{{ t("New book") }}</h2>
+  <form method="post" action="{{ url_for('create_book') }}" class="row">
+    <label class="field compact" data-tip="{{ t('You can change this later.') }}">
+      <span class="label">{{ t("Name") }}</span>
+      <input name="title" placeholder="{{ t('Farm book') }}" required maxlength="80" autocomplete="off">
+    </label>
+    <label class="field compact" data-tip="{{ t('The paper you will print on. Landscape suits a double page.') }}">
+      <span class="label">{{ t("Paper") }}</span>
+      <select name="paper">
+        <option value="a4-landscape">{{ t("A4 landscape") }}</option>
+        <option value="a4-portrait">{{ t("A4 portrait") }}</option>
+        <option value="a5-landscape">{{ t("A5 landscape") }}</option>
+        <option value="a5-portrait">{{ t("A5 portrait") }}</option>
       </select>
     </label>
-    <button type="submit">Create</button>
+    <button type="submit">{{ t("Create book") }}</button>
   </form>
 </section>
 
 <section class="card">
-  <h2>Projects <span class="muted">({{ projects|length }})</span></h2>
-  {% if projects %}
+  <h2>{{ t("Books") }} <span class="muted">({{ books|length }})</span></h2>
+  {% if books %}
   <table class="list">
-    <thead><tr><th>Name</th><th>Files</th><th>Size</th><th>Last change</th><th></th></tr></thead>
+    <thead><tr><th>{{ t("Name") }}</th><th>{{ t("Files") }}</th><th>{{ t("Size") }}</th><th>{{ t("Last change") }}</th><th></th></tr></thead>
     <tbody>
-      {% for p in projects %}
+      {% for p in books %}
       <tr>
-        <td><a class="strong" href="{{ url_for('project_view', name=p.name) }}">{{ p.name }}</a></td>
+        <td><a class="strong" href="{{ url_for('edit_book', name=p.name) }}">{{ p.name }}</a></td>
         <td class="muted">{{ p.files }}</td>
         <td class="muted">{{ p.size }}</td>
         <td class="muted">{{ p.mtime }}</td>
         <td class="right nowrap">
+          <a class="button ghost" href="{{ url_for('edit_book', name=p.name) }}">{{ t("Open") }}</a>
           <a class="button ghost" href="{{ url_for('archive', name=p.name) }}"
-             data-tip="Download every file of this project as one zip — that is the whole backup.">Download .zip</a>
+             data-tip="{{ t('Download everything as one zip — that is the whole backup.') }}">{{ t("Backup") }}</a>
           {% if allow_delete %}
           <form method="post" action="{{ url_for('delete_project', name=p.name) }}" class="inline"
-                data-confirm="Delete project {{ p.name }} and all its files?">
-            <button class="danger ghost" type="submit"
-                    data-tip="Delete the project directory and everything in it. There is no undo.">Delete</button>
+                data-confirm="{{ t('Delete “{name}” and everything in it?', name=p.name) }}">
+            <button class="danger ghost" type="submit">{{ t("Delete") }}</button>
           </form>
           {% endif %}
         </td>
@@ -57,9 +57,57 @@
     </tbody>
   </table>
   {% else %}
-  <p class="muted empty">No projects yet. Create one above.</p>
+  <p class="muted empty">{{ t("No books yet — make your first one above.") }}</p>
   {% endif %}
 </section>
+
+<details class="card drawer-card">
+  <summary>
+    <strong>{{ t("Advanced: tttool projects") }}</strong>
+    <span class="muted">({{ others|length }})</span>
+  </summary>
+  <p class="muted hint">
+    {{ t("Working directly with YAML sources and GME files — the tttool command line in the browser. You do not need this to make a book.") }}
+  </p>
+
+  <form method="post" action="{{ url_for('create_project') }}" class="row">
+    <input name="name" placeholder="my-project" required pattern="[A-Za-z0-9][A-Za-z0-9._\-]{0,63}"
+           title="{{ t('Letters, digits, dot, underscore and dash') }}" autocomplete="off">
+    <label class="field compact">
+      <span class="label">{{ t("Start from") }}</span>
+      <select name="start">
+        <option value="template">{{ t("a minimal book.yaml") }}</option>
+        {% if examples %}<option value="example">{{ t("the example book (with audio)") }}</option>{% endif %}
+        <option value="empty">{{ t("nothing (I have files to upload)") }}</option>
+      </select>
+    </label>
+    <button type="submit" class="ghost">{{ t("Create") }}</button>
+  </form>
+
+  {% if others %}
+  <table class="list">
+    <tbody>
+      {% for p in others %}
+      <tr>
+        <td><a class="strong" href="{{ url_for('project_view', name=p.name) }}">{{ p.name }}</a></td>
+        <td class="muted">{{ p.files }}</td>
+        <td class="muted">{{ p.size }}</td>
+        <td class="muted">{{ p.mtime }}</td>
+        <td class="right nowrap">
+          <a class="button ghost" href="{{ url_for('archive', name=p.name) }}">{{ t("Backup") }}</a>
+          {% if allow_delete %}
+          <form method="post" action="{{ url_for('delete_project', name=p.name) }}" class="inline"
+                data-confirm="{{ t('Delete “{name}” and everything in it?', name=p.name) }}">
+            <button class="danger ghost" type="submit">{{ t("Delete") }}</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</details>
 {% endblock %}
 
 {% block scripts %}

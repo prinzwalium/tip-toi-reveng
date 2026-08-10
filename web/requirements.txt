@@ -1,2 +1,5 @@
 Flask==3.1.3
 waitress==3.0.2
+# Printing: the page is composed as SVG and rendered at its true physical size.
+CairoSVG==2.9.0
+pypdf==6.15.0

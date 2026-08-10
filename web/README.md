@@ -1,8 +1,23 @@
 tttool web GUI
 ==============
 
-A small browser front end for [`tttool`](https://github.com/entropia/tip-toi-reveng),
-meant to be run as a container on your own server. It gives you
+Make your own Tiptoi books in the browser, on your own server. The interface is
+German by default (`TTTOOL_WEB_LANG=en` switches to English).
+
+**Making a book** — the part that needs no technical knowledge:
+
+ 1. *Neues Buch*, give it a name, pick the paper size.
+ 2. Upload a picture of the page.
+ 3. Drag rectangles onto it, one per thing that should make a sound, and give
+    each one a sound file.
+ 4. *Buch erstellen* → a PDF to print and a `.gme` file to copy onto the pen.
+
+Print the PDF **at 100%** (never “fit to page”) on a laser printer, check the
+printed 50 mm mark with a ruler, tap the power-on field, and the pen reads your
+book. What is still missing is on the [roadmap](ROADMAP.md).
+
+Under the book editor sits a full front end for
+[`tttool`](https://github.com/entropia/tip-toi-reveng), for anyone who wants it:
 
  * **projects** — one directory per book, with upload, in-browser YAML editing,
    download of single files and of the whole project as a zip,
@@ -76,6 +91,12 @@ $ docker compose -f docker-compose.ghcr.yml up -d
 `docker compose -f docker-compose.ghcr.yml pull && … up -d` updates it later.
 The workflow builds `linux/amd64` only — compiling tttool for arm64 under
 emulation takes hours, so build the image on the ARM machine itself instead.
+
+Pick a channel with `TTTOOL_IMAGE` in `.env`: `:latest` for releases, `:beta`
+for the next version if you are willing to report what breaks, `:edge` for
+every merge. [RELEASING.md](RELEASING.md) explains the channels, how to report
+a beta problem and how a release is cut; [ROADMAP.md](ROADMAP.md) is where this
+is going — a book editor that needs no technical knowledge at all.
 
 
 Where your data lives

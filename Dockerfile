@@ -91,6 +91,8 @@ ENV LANG=C.UTF-8 \
 # ffmpeg converts uploaded audio, vorbis-tools (oggenc) and a speech synthesizer
 # are what tttool needs for its text-to-speech feature.  SVOX pico sounds much
 # better than espeak but lives in Debian's non-free component, so it is optional.
+# libcairo2 and the DejaVu fonts are what the book editor renders its printable
+# pages with.
 RUN set -eux; \
     printf '%s\n' \
         'Types: deb' \
@@ -104,6 +106,8 @@ RUN set -eux; \
         ca-certificates \
         espeak-ng \
         ffmpeg \
+        fonts-dejavu-core \
+        libcairo2 \
         libgmp10 \
         libnuma1 \
         libtinfo6 \
@@ -138,6 +142,18 @@ RUN set -eux; \
     useradd --uid 1000 --gid 1000 --home-dir /data --shell /usr/sbin/nologin tttool; \
     mkdir -p /data; \
     chown -R tttool:tttool /data
+
+# Which build this is, shown in the footer of the GUI and by /healthz — so a
+# beta tester can say what they are running. Declared last on purpose: these
+# change on every commit and would otherwise invalidate the layers above.
+ARG BUILD_REF=local
+ARG BUILD_SHA=
+ENV TTTOOL_WEB_BUILD_REF=$BUILD_REF \
+    TTTOOL_WEB_BUILD_SHA=$BUILD_SHA
+LABEL org.opencontainers.image.title="tttool web GUI" \
+      org.opencontainers.image.description="Browser front end for tttool, the Tiptoi swiss army knife" \
+      org.opencontainers.image.source="https://github.com/entropia/tip-toi-reveng" \
+      org.opencontainers.image.licenses="MIT"
 
 WORKDIR /app
 USER tttool
