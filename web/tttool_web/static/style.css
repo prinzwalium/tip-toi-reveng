@@ -272,6 +272,11 @@ button.active { background: var(--accent); color: var(--accent-ink); border-colo
 }
 .sound-row:last-child { border-bottom: none; }
 .sound-row .sound-name-input { flex: 1; min-width: 8em; }
+.sound-row .grow { flex: 1; min-width: 6em; }
+.group-settings { margin-top: 8px; }
+.group-settings .sound-row { border-bottom: none; padding: 3px 0; }
+#area-script { width: 100%; }
+.book-side .sound-box + .sound-box { margin-top: 10px; }
 .sound-row button { padding: 3px 10px; font-size: 13px; }
 .preview-player { width: 100%; }
 #speak-text { width: 100%; }

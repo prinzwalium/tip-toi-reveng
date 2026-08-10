@@ -286,8 +286,8 @@ def test_generated_yaml_is_derived_from_the_book(client, built):
     name, _ = built
     yaml = (client.data_dir / name / "book.yaml").read_text()
     assert 'media-path: "sounds/%s"' in yaml
-    assert "s1_a1: P(t1)" in yaml
-    assert "s1_a2: P(t2)" in yaml
+    assert 's1_a1: "P(t1)"' in yaml
+    assert 's1_a2: "P(t2)"' in yaml
 
 
 def test_printed_page_has_the_right_physical_size(client, built):
@@ -606,3 +606,165 @@ def test_without_a_synthesizer_speaking_says_so(client, monkeypatch):
         response = fresh.post("/b/stumm/sounds/speak", data={"text": "Hallo"})
         assert response.status_code == 400
         assert "speech synthesizer" in response.get_json()["error"]
+
+
+# -- what an area does ------------------------------------------------------
+
+
+def library_sound(client, name, filename="ton.mp3"):
+    return client.post(
+        f"/b/{name}/sounds/add",
+        data={"sound": (io.BytesIO(b"audio"), filename)},
+        content_type="multipart/form-data",
+    ).get_json()["sound"]
+
+
+def script_for(client, name, area_id="a1"):
+    """The generated script lines for one area, from the built YAML."""
+    assert client.post(f"/b/{name}/build").get_json().get("ok") is not False
+    yaml = (client.data_dir / name / "book.yaml").read_text()
+    lines, collecting = [], False
+    for line in yaml.splitlines():
+        if line.startswith(f"  s1_{area_id}:"):
+            rest = line.split(":", 1)[1].strip()
+            if rest:
+                return [rest.strip('"')]
+            collecting = True
+        elif collecting:
+            if line.startswith("  - "):
+                lines.append(line[4:].strip().strip('"'))
+            else:
+                break
+    return lines
+
+
+def test_random_plays_one_of_several(client):
+    name = make_book(client)
+    first, second = library_sound(client, name), library_sound(client, name)
+    put_areas(client, name, [{"id": "a1", "name": "Vogel", "x": 10, "y": 10, "w": 40, "h": 30,
+                              "behaviour": "random", "sound_ids": [first, second]}])
+    assert script_for(client, name) == [f"P({first},{second})"]
+
+
+def test_sequence_steps_through_and_starts_over(client):
+    name = make_book(client)
+    one, two, three = (library_sound(client, name) for _ in range(3))
+    put_areas(client, name, [{"id": "a1", "name": "Geschichte", "x": 10, "y": 10, "w": 40, "h": 30,
+                              "behaviour": "sequence", "sound_ids": [one, two, three]}])
+    lines = script_for(client, name)
+    assert lines == [
+        f"$seqa1==0? $seqa1:=1 P({one})",
+        f"$seqa1==1? $seqa1:=2 P({two})",
+        f"$seqa1==2? $seqa1:=0 P({three})",
+    ]
+
+
+def test_quiz_answers_play_the_right_reaction(client):
+    name = make_book(client)
+    right, wrong, own = (library_sound(client, name) for _ in range(3))
+    group = client.post(f"/b/{name}/groups", data={"kind": "quiz"}).get_json()["group"]
+    client.post(f"/b/{name}/groups/{group}",
+                data={"right_sound_id": right, "wrong_sound_id": wrong})
+    put_areas(client, name, [
+        {"id": "a1", "name": "Richtig", "x": 10, "y": 10, "w": 40, "h": 30,
+         "behaviour": "answer", "group": group, "correct": True, "sound_id": own},
+        {"id": "a2", "name": "Falsch", "x": 80, "y": 10, "w": 40, "h": 30,
+         "behaviour": "answer", "group": group, "correct": False},
+    ])
+    assert script_for(client, name, "a1") == [f"P({own}) P({right})"]
+    assert script_for(client, name, "a2") == [f"P({wrong})"]
+
+
+def test_collecting_game_rewards_the_last_find(client):
+    name = make_book(client)
+    reward = library_sound(client, name)
+    own = library_sound(client, name)
+    group = client.post(f"/b/{name}/groups", data={"kind": "collect"}).get_json()["group"]
+    client.post(f"/b/{name}/groups/{group}", data={"reward_sound_id": reward})
+    put_areas(client, name, [
+        {"id": "a1", "name": "Maus 1", "x": 10, "y": 10, "w": 40, "h": 30,
+         "behaviour": "collect", "group": group, "sound_id": own},
+        {"id": "a2", "name": "Maus 2", "x": 80, "y": 10, "w": 40, "h": 30,
+         "behaviour": "collect", "group": group, "sound_id": own},
+        {"id": "a3", "name": "Maus 3", "x": 150, "y": 10, "w": 40, "h": 30,
+         "behaviour": "collect", "group": group, "sound_id": own},
+    ])
+    lines = script_for(client, name, "a1")
+    # three mice: the tap that finds the third one plays the reward
+    assert lines[0] == f"$gota1==0? $cnt{group}==2? $gota1:=1 $cnt{group}+=1 P({own}) P({reward})"
+    assert lines[1] == f"$gota1==0? $gota1:=1 $cnt{group}+=1 P({own})"
+    assert lines[2] == f"P({own})"
+
+
+def test_a_hand_written_script_is_used_as_is(client):
+    name = make_book(client)
+    put_areas(client, name, [{"id": "a1", "name": "Selbst", "x": 10, "y": 10, "w": 40, "h": 30,
+                              "behaviour": "advanced",
+                              "script": "$mode==1? $mode:=2 P(t1)\n$mode:=1 P(t2)"}])
+    assert script_for(client, name) == ["$mode==1? $mode:=2 P(t1)", "$mode:=1 P(t2)"]
+
+
+def test_a_hand_written_script_cannot_break_out_of_the_yaml(client):
+    name = make_book(client)
+    sound = library_sound(client, name)
+    put_areas(client, name, [{"id": "a1", "name": "Böse", "x": 10, "y": 10, "w": 40, "h": 30,
+                              "behaviour": "advanced",
+                              "script": f'P({sound})\nproduct-id: 999\nwelcome: "x'}])
+    client.post(f"/b/{name}/build")
+    yaml = (client.data_dir / name / "book.yaml").read_text()
+    # The structure of the file is untouched: no second product id, no new
+    # top-level key, and the injected text does not survive as a script line.
+    top_level = [
+        line.split(":")[0]
+        for line in yaml.splitlines()
+        if line and not line[0].isspace() and not line.startswith("#")
+    ]
+    assert top_level == ["product-id", "comment", "media-path", "scripts"]
+    assert "999" not in yaml
+    assert "welcome" not in yaml
+
+
+def test_an_area_with_a_behaviour_but_no_sound_is_reported(client):
+    name = make_book(client)
+    put_areas(client, name, [{"id": "a1", "name": "Leer", "x": 10, "y": 10, "w": 40, "h": 30,
+                              "behaviour": "random", "sound_ids": []}])
+    result = client.post(f"/b/{name}/build").get_json()
+    assert result["ok"] is False
+    assert any("no area with a sound" in p for p in result["problems"])
+
+
+def test_deleting_a_game_puts_its_areas_back_to_playing(client):
+    name = make_book(client)
+    sound = library_sound(client, name)
+    group = client.post(f"/b/{name}/groups", data={"kind": "quiz"}).get_json()["group"]
+    put_areas(client, name, [{"id": "a1", "name": "Antwort", "x": 10, "y": 10, "w": 40, "h": 30,
+                              "behaviour": "answer", "group": group, "sound_id": sound}])
+    result = client.post(f"/b/{name}/groups/{group}/delete").get_json()
+    area = result["book"]["pages"][0]["areas"][0]
+    assert area["group"] == ""
+    assert area["behaviour"] == "play"
+
+
+def test_saving_the_layout_cannot_delete_the_library(client):
+    """A browser tab with a stale copy must not wipe sounds or games."""
+    name = make_book(client)
+    sound = library_sound(client, name)
+    group = client.post(f"/b/{name}/groups", data={"kind": "quiz"}).get_json()["group"]
+    put_areas(client, name, [{"id": "a1", "name": "Hund", "x": 10, "y": 10, "w": 40, "h": 30,
+                              "sound_id": sound}])
+
+    # …exactly what an autosave from a tab opened before the sound existed does
+    client.put(f"/b/{name}/data", json={
+        "title": "Mein Buch", "product_id": 42, "paper": "a4-landscape",
+        "sounds": [], "groups": [],
+        "pages": [{"id": "s1", "name": "Seite 1", "areas": [
+            {"id": "a1", "name": "Hund", "x": 20, "y": 20, "w": 40, "h": 30,
+             "sound_id": sound}]}],
+    })
+
+    book = client.get(f"/b/{name}/data").get_json()
+    assert [s["id"] for s in book["sounds"]] == [sound]
+    assert [g["id"] for g in book["groups"]] == [group]
+    assert book["pages"][0]["areas"][0]["sound_id"] == sound
+    assert book["pages"][0]["areas"][0]["x"] == 20  # the move itself was saved
+    assert (client.data_dir / name / "sounds" / f"{sound}.ogg").is_file()

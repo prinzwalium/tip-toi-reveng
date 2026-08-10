@@ -90,7 +90,19 @@
           <input type="number" id="area-h" step="1" min="1"></label>
       </div>
 
-      <div class="sound-box">
+      <label class="field" data-tip="{{ t('What the pen does when it touches this area.') }}">
+        <span class="label">{{ t("What happens?") }}</span>
+        <select id="area-behaviour">
+          <option value="play">{{ t("Play a sound") }}</option>
+          <option value="random">{{ t("One of several, at random") }}</option>
+          <option value="sequence">{{ t("One after the other") }}</option>
+          <option value="answer">{{ t("Answer in a quiz") }}</option>
+          <option value="collect">{{ t("Part of a collecting game") }}</option>
+          <option value="advanced">{{ t("Written by hand (advanced)") }}</option>
+        </select>
+      </label>
+
+      <div class="sound-box" data-for="play answer collect">
         <div class="row">
           <button type="button" id="sound-choose">{{ t("Choose sound …") }}</button>
           <button type="button" id="sound-play" class="ghost hidden">▶ {{ t("Play") }}</button>
@@ -99,6 +111,31 @@
         </div>
         <p id="sound-name" class="muted hint">{{ t("No sound yet — the area stays silent.") }}</p>
         <audio id="sound-player" hidden></audio>
+      </div>
+
+      <div class="sound-box" data-for="random sequence">
+        <p class="muted hint" id="many-hint"></p>
+        <div id="sound-many"></div>
+        <button type="button" id="sound-add" class="ghost">+ {{ t("Add sound") }}</button>
+      </div>
+
+      <div class="sound-box" data-for="answer collect">
+        <label class="field">
+          <span class="label">{{ t("Belongs to") }}</span>
+          <select id="area-group"></select>
+        </label>
+        <label class="check" data-for="answer">
+          <input type="checkbox" id="area-correct"> {{ t("This is the right answer") }}
+        </label>
+        <div id="group-settings" class="group-settings"></div>
+      </div>
+
+      <div class="sound-box" data-for="advanced">
+        <p class="muted hint">
+          {{ t("One script line per row, in tttool's language — see the handbook. Everything else in this panel is ignored.") }}
+        </p>
+        <textarea id="area-script" rows="4" spellcheck="false"
+                  placeholder="$mode==1? $mode:=2 P(t1)"></textarea>
       </div>
 
       <div class="row">
@@ -197,6 +234,9 @@
      data-page-duplicate="{{ url_for('duplicate_page', name=project.name, page_id='PAGE') }}"
      data-page-delete="{{ url_for('delete_page', name=project.name, page_id='PAGE') }}"
      data-page-move="{{ url_for('move_page', name=project.name, page_id='PAGE') }}"
+     data-group-add="{{ url_for('add_group', name=project.name) }}"
+     data-group-update="{{ url_for('update_group', name=project.name, group_id='GROUP') }}"
+     data-group-delete="{{ url_for('delete_group', name=project.name, group_id='GROUP') }}"
      data-build="{{ url_for('build_book', name=project.name) }}"
      data-raw="{{ url_for('raw', name=project.name, path='PATH') }}"
      hidden></div>

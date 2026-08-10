@@ -22,7 +22,7 @@
   var saveTimer = null;
 
   function say(key) { return T[key] || key; }
-  function url(template, value) { return template.replace(/PAGE|AREA|PATH/, encodeURIComponent(value)); }
+  function url(template, value) { return template.replace(/PAGE|AREA|PATH|GROUP/, encodeURIComponent(value)); }
   function area(id) { return currentPage.areas.filter(function (a) { return a.id === id; })[0]; }
   function soundOf(a) {
     if (!a || !a.sound_id) return null;
@@ -153,6 +153,123 @@
     document.getElementById("sound-name").textContent = sound
       ? sound.name || sound.id
       : say("No sound yet — the area stays silent.");
+
+    document.getElementById("area-behaviour").value = a.behaviour || "play";
+    document.getElementById("area-script").value = a.script || "";
+    document.getElementById("area-correct").checked = !!a.correct;
+    showBehaviour(a.behaviour || "play");
+    renderManySounds(a);
+    renderGroups(a);
+  }
+
+  // Only the panels that belong to the chosen behaviour are shown.
+  function showBehaviour(behaviour) {
+    $$("#area-form [data-for]").forEach(function (panel) {
+      panel.classList.toggle("hidden", panel.dataset.for.split(" ").indexOf(behaviour) < 0);
+    });
+    var hint = document.getElementById("many-hint");
+    hint.textContent = behaviour === "sequence"
+      ? say("One sound per tap, in this order; then it starts again.")
+      : say("The pen picks one of these each time.");
+  }
+
+  function $$(selector) {
+    return Array.prototype.slice.call(document.querySelectorAll(selector));
+  }
+
+  function renderManySounds(a) {
+    var box = document.getElementById("sound-many");
+    box.textContent = "";
+    (a.sound_ids || []).forEach(function (soundId, index) {
+      var entry = (book.sounds || []).filter(function (s) { return s.id === soundId; })[0];
+      var row = document.createElement("div");
+      row.className = "sound-row";
+      var label = document.createElement("span");
+      label.className = "grow";
+      label.textContent = (index + 1) + ". " + (entry ? entry.name || entry.id : soundId);
+      row.appendChild(label);
+      row.appendChild(smallButton("▶", "ghost", function () {
+        if (entry) playFile(entry.file);
+      }));
+      row.appendChild(smallButton("↑", "ghost", function () {
+        if (index === 0) return;
+        snapshot();
+        a.sound_ids.splice(index - 1, 0, a.sound_ids.splice(index, 1)[0]);
+        change();
+      }));
+      row.appendChild(smallButton("×", "ghost danger", function () {
+        snapshot();
+        a.sound_ids.splice(index, 1);
+        change();
+      }));
+      box.appendChild(row);
+    });
+  }
+
+  function smallButton(label, className, action) {
+    var element = document.createElement("button");
+    element.type = "button";
+    element.className = className;
+    element.textContent = label;
+    element.addEventListener("click", action);
+    return element;
+  }
+
+  function playFile(file) {
+    var player = document.getElementById("sound-player");
+    player.src = url(urls.raw, file);
+    player.play();
+  }
+
+  function renderGroups(a) {
+    var select = document.getElementById("area-group");
+    select.textContent = "";
+    var kind = a.behaviour === "collect" ? "collect" : "quiz";
+    (book.groups || []).filter(function (g) { return g.kind === kind; }).forEach(function (group) {
+      var option = document.createElement("option");
+      option.value = group.id;
+      option.textContent = group.name || group.id;
+      if (group.id === a.group) option.selected = true;
+      select.appendChild(option);
+    });
+    var fresh = document.createElement("option");
+    fresh.value = "+";
+    fresh.textContent = say("+ New game");
+    select.appendChild(fresh);
+
+    var settings = document.getElementById("group-settings");
+    settings.textContent = "";
+    var group = (book.groups || []).filter(function (g) { return g.id === a.group; })[0];
+    if (!group) return;
+
+    var fields = group.kind === "quiz"
+      ? [["right_sound_id", say("Sound for a right answer")],
+         ["wrong_sound_id", say("Sound for a wrong answer")]]
+      : [["reward_sound_id", say("Reward when everything is found")]];
+    fields.forEach(function (entry) {
+      var row = document.createElement("div");
+      row.className = "sound-row";
+      var label = document.createElement("span");
+      label.className = "grow hint";
+      var chosen = (book.sounds || []).filter(function (s) { return s.id === group[entry[0]]; })[0];
+      label.textContent = entry[1] + ": " + (chosen ? chosen.name || chosen.id : say("none"));
+      row.appendChild(label);
+      row.appendChild(smallButton(say("Choose"), "ghost", function () {
+        flush().then(function () {
+          window.SoundPicker.open(function (library, soundId) {
+            if (!soundId) return;
+            var data = new FormData();
+            data.append(entry[0], soundId);
+            post(url(urls.groupUpdate, group.id), data, function (result) {
+              book.groups = result.book.groups;
+              book.sounds = (library && library.sounds) || book.sounds;
+              render();
+            });
+          });
+        });
+      }));
+      settings.appendChild(row);
+    });
   }
 
   function showPicture() {
@@ -364,6 +481,84 @@
     });
   });
 
+  // -------------------------------------------------- behaviours
+
+  document.getElementById("area-behaviour").addEventListener("change", function () {
+    var a = selected();
+    if (!a) return;
+    snapshot();
+    a.behaviour = this.value;
+    // Moving to "one of several" starts from the sound already chosen.
+    if ((a.behaviour === "random" || a.behaviour === "sequence") &&
+        !(a.sound_ids || []).length && a.sound_id) {
+      a.sound_ids = [a.sound_id];
+    }
+    if ((a.behaviour === "answer" || a.behaviour === "collect") && !a.group) {
+      var kind = a.behaviour === "collect" ? "collect" : "quiz";
+      var existing = (book.groups || []).filter(function (g) { return g.kind === kind; })[0];
+      if (existing) {
+        a.group = existing.id;
+      } else {
+        newGroup(kind);
+        return;
+      }
+    }
+    change();
+  });
+
+  document.getElementById("area-correct").addEventListener("change", function () {
+    var a = selected();
+    if (!a) return;
+    a.correct = this.checked;
+    change();
+  });
+
+  document.getElementById("area-script").addEventListener("change", function () {
+    var a = selected();
+    if (!a) return;
+    snapshot();
+    a.script = this.value;
+    change();
+  });
+
+  document.getElementById("sound-add").addEventListener("click", function () {
+    var a = selected();
+    if (!a) return;
+    flush().then(function () {
+      window.SoundPicker.open(function (library, soundId) {
+        if (library && library.sounds) book.sounds = library.sounds;
+        if (!soundId) { render(); return; }
+        snapshot();
+        a.sound_ids = (a.sound_ids || []).concat([soundId]);
+        change();
+      });
+    });
+  });
+
+  document.getElementById("area-group").addEventListener("change", function () {
+    var a = selected();
+    if (!a) return;
+    if (this.value === "+") {
+      newGroup(a.behaviour === "collect" ? "collect" : "quiz");
+      return;
+    }
+    a.group = this.value;
+    change();
+  });
+
+  function newGroup(kind) {
+    var a = selected();
+    var data = new FormData();
+    data.append("kind", kind);
+    flush().then(function () {
+      post(urls.groupAdd, data, function (result) {
+        book.groups = result.book.groups;
+        a.group = result.group;
+        change();
+      });
+    });
+  }
+
   document.getElementById("area-delete").addEventListener("click", function () {
     var a = selected();
     if (!a || !window.confirm(say("Delete this area?"))) return;
@@ -430,14 +625,14 @@
     if (!a) return;
     flush().then(function () {
       window.SoundPicker.open(function (library, soundId) {
+        if (library && library.sounds) book.sounds = library.sounds;
         if (library && library.book) {   // a sound was deleted while picking
           book.pages = library.book.pages;
           currentPage = book.pages.filter(function (p) { return p.id === currentPage.id; })[0];
-          book.sounds = library.sounds;
           render();
           return;
         }
-        if (!soundId) return;
+        if (!soundId) { render(); return; }
         var data = new FormData();
         data.append("sound_id", soundId);
         post(url(urls.soundAssign, a.id), data, function (result) {

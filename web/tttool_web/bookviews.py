@@ -11,7 +11,7 @@ from pathlib import Path
 from flask import jsonify, redirect, render_template, request, url_for
 
 from .audio import VOICES, speak, speech_engine, store_sound
-from .book import PAPER_SIZES, Book, store_upload
+from .book import GROUP_KINDS, PAPER_SIZES, Book, store_upload
 from .bookbuild import build, converters_available
 from .i18n import t
 from .projects import Project, ProjectError, list_projects, sanitize_filename
@@ -44,6 +44,14 @@ JS_STRINGS = [
     "This browser cannot record, or the page is not served over https.",
     "No microphone available, or permission was refused.",
     "This installation cannot speak text (no speech synthesizer installed).",
+    "One sound per tap, in this order; then it starts again.",
+    "The pen picks one of these each time.",
+    "+ New game",
+    "Sound for a right answer",
+    "Sound for a wrong answer",
+    "Reward when everything is found",
+    "none",
+    "Choose",
 ]
 
 
@@ -119,16 +127,16 @@ def register_book_routes(app, route, get_project):
         project, book = get_book_project(name)
         if request.method == "GET":
             return jsonify(book.to_dict())
-        updated = Book.from_dict(request.get_json(silent=True) or {})
-        # The pictures and sounds on disk belong to the server, not the browser.
+        # The library, the games and the pictures on disk belong to the
+        # server: a browser tab with a stale copy must not be able to delete a
+        # sound just by saving where an area sits.
+        updated = Book.from_dict(request.get_json(silent=True) or {}, keep=book)
         by_page = {p.id: p for p in book.pages}
         for page in updated.pages:
             known = by_page.get(page.id)
             if known is None:
                 continue
             page.image = known.image
-            # Sounds are assigned through their own route; from_dict already
-            # dropped any sound_id that is not in the library.
         updated.save(project)
         problems, hints = updated.check()
         return jsonify({"ok": True, "problems": problems, "hints": hints})
@@ -240,6 +248,51 @@ def register_book_routes(app, route, get_project):
         area.sound_id = sound_id
         book.save(project)
         return jsonify({"ok": True, "book": book.to_dict(), **library(project, book)})
+
+    # -- games ------------------------------------------------------------
+
+    @route("/b/<name>/groups", methods=["POST"])
+    def add_group(name):
+        """A quiz or a collecting game that areas can be put into."""
+        project, book = get_book_project(name)
+        kind = request.form.get("kind") if request.form.get("kind") in GROUP_KINDS else "quiz"
+        given = (request.form.get("name") or "").strip()[:80]
+        default = t("Quiz {number}") if kind == "quiz" else t("Collection {number}")
+        group = book.add_group(
+            kind=kind,
+            name=given or default.format(number=len(book.groups) + 1),
+        )
+        book.save(project)
+        return jsonify({"ok": True, "group": group.id, "book": book.to_dict()})
+
+    @route("/b/<name>/groups/<group_id>", methods=["POST"])
+    def update_group(name, group_id):
+        project, book = get_book_project(name)
+        group = book.group_of(group_id)
+        if "name" in request.form:
+            group.name = (request.form.get("name") or "").strip()[:80] or group.name
+        for field_name in ("right_sound_id", "wrong_sound_id", "reward_sound_id"):
+            if field_name in request.form:
+                value = (request.form.get(field_name) or "").strip()
+                if value:
+                    book.sound(value)  # raises if it is gone
+                setattr(group, field_name, value)
+        book.save(project)
+        return jsonify({"ok": True, "book": book.to_dict()})
+
+    @route("/b/<name>/groups/<group_id>/delete", methods=["POST"])
+    def delete_group(name, group_id):
+        project, book = get_book_project(name)
+        book.group_of(group_id)
+        book.groups = [g for g in book.groups if g.id != group_id]
+        for page in book.pages:
+            for area in page.areas:
+                if area.group == group_id:
+                    area.group = ""
+                    if area.behaviour in ("answer", "collect"):
+                        area.behaviour = "play"
+        book.save(project)
+        return jsonify({"ok": True, "book": book.to_dict()})
 
     # -- building ---------------------------------------------------------
 
