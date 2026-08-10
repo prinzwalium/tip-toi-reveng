@@ -10,11 +10,18 @@ name: "Docker image"
 # with the same Dockerfile.
 
 on:
-  # Pushes to master and tags always publish, so that the published image
-  # matches the branch even when only, say, an example file changed.
+  # Pushes to master and beta and release tags always publish, so that the
+  # published image matches the branch even when only an example file changed.
+  #
+  #   master        -> :edge      (what is merged, may be rough)
+  #   beta          -> :beta      (what you are asked to test)
+  #   tag web-v*    -> :1.2.3, :1.2, :1, :latest
+  #
+  # Release tags are prefixed with "web-" so that they never collide with
+  # tttool's own version tags in this repository.
   push:
-    branches: [ master ]
-    tags: [ '*' ]
+    branches: [ master, beta ]
+    tags: [ 'web-v*' ]
   # Pull requests only rebuild when something the image is made of changed.
   pull_request:
     paths:
@@ -68,6 +75,16 @@ jobs:
       - run: python -m pytest tests -q
         working-directory: web
 
+      # A release tag must name the version the code actually reports.
+      - name: Version matches the release tag
+        if: startsWith(github.ref, 'refs/tags/web-v')
+        run: |
+          set -eux
+          tagged="${GITHUB_REF_NAME#web-v}"
+          declared=$(python -c "import sys; sys.path.insert(0, 'web'); import tttool_web; print(tttool_web.__version__)")
+          test "$tagged" = "$declared" \
+            || { echo "tag $GITHUB_REF_NAME does not match __version__ $declared" >&2; exit 1; }
+
   image:
     name: Build image
     needs: web-tests
@@ -91,6 +108,8 @@ jobs:
           tags: tttool-web:ci
           build-args: |
             TTTOOL_SOURCE=${{ inputs.tttool_source || 'build' }}
+            BUILD_REF=${{ github.ref_name }}
+            BUILD_SHA=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -140,6 +159,13 @@ jobs:
           test -s ci.gme
           docker exec tttool-web tttool info /data/ci/ci.gme
 
+          # The build stamp is what a beta tester reports back, so check it is there.
+          echo "::group::build stamp"
+          curl -fsS http://127.0.0.1:8080/healthz | tee /tmp/health.json
+          echo
+          grep -q '"commit": *"[0-9a-f]\{7\}"' /tmp/health.json
+          echo "::endgroup::"
+
       - name: Log in to ghcr.io
         if: github.event_name == 'push' || inputs.push
         uses: docker/login-action@v3
@@ -154,10 +180,15 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.IMAGE_NAME }}
+          # Release tags look like web-v1.2.3; "latest" only ever moves on a
+          # release, so that pulling :latest never lands on an untested build.
           tags: |
-            type=ref,event=branch
-            type=ref,event=tag
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=edge,enable={{is_default_branch}}
+            type=raw,value=beta,enable=${{ github.ref == 'refs/heads/beta' }}
+            type=match,pattern=web-v(\d+\.\d+\.\d+),group=1
+            type=match,pattern=web-v(\d+\.\d+),group=1
+            type=match,pattern=web-v(\d+),group=1
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/web-v') }}
             type=sha,format=short
 
       - name: Push image
@@ -170,5 +201,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             TTTOOL_SOURCE=${{ inputs.tttool_source || 'build' }}
+            BUILD_REF=${{ github.ref_name }}
+            BUILD_SHA=${{ github.sha }}
           # Everything is in the cache from the build step above already.
           cache-from: type=gha

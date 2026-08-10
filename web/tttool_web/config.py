@@ -41,6 +41,11 @@ class Config:
     AUTH_USER = os.environ.get("TTTOOL_WEB_USER", "")
     AUTH_PASSWORD = os.environ.get("TTTOOL_WEB_PASSWORD", "")
 
+    #: Stamped into the image at build time: the branch or tag it was built
+    #: from and the commit. Empty when running straight from a checkout.
+    BUILD_REF = os.environ.get("TTTOOL_WEB_BUILD_REF", "")
+    BUILD_SHA = os.environ.get("TTTOOL_WEB_BUILD_SHA", "")[:7]
+
     #: Allow deleting projects and files through the UI.
     ALLOW_DELETE = _bool("TTTOOL_WEB_ALLOW_DELETE", True)
 
@@ -57,6 +62,13 @@ class Config:
     @property
     def auth_enabled(self) -> bool:
         return bool(self.AUTH_USER and self.AUTH_PASSWORD)
+
+    @property
+    def build(self) -> str:
+        """Human readable build id, e.g. "beta (a1b2c3d)" or "" for a checkout."""
+        if self.BUILD_REF and self.BUILD_SHA:
+            return f"{self.BUILD_REF} ({self.BUILD_SHA})"
+        return self.BUILD_REF or self.BUILD_SHA
 
 
 config = Config()

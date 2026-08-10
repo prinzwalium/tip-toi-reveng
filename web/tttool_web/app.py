@@ -146,6 +146,7 @@ def create_app() -> Flask:
     def template_globals():
         return {
             "app_version": __version__,
+            "app_build": config.build,
             "tttool_version": app.config.setdefault("TTTOOL_VERSION", tttool_version()),
             "allow_delete": config.ALLOW_DELETE,
         }
@@ -322,7 +323,14 @@ def create_app() -> Flask:
 
     @app.route("/healthz")
     def healthz():
-        return jsonify({"status": "ok", "tttool": tttool_version()})
+        return jsonify(
+            {
+                "status": "ok",
+                "tttool": tttool_version(),
+                "version": __version__,
+                "build": {"ref": config.BUILD_REF, "commit": config.BUILD_SHA},
+            }
+        )
 
     return app
 

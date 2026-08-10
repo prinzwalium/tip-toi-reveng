@@ -39,7 +39,9 @@
 </main>
 
 <footer class="muted">
-  tttool web {{ app_version }} — a browser front end for
+  tttool web {{ app_version }}{% if app_build %}
+    <span data-tip="The image this container was built from. Please mention it when reporting a problem with a beta build.">· {{ app_build }}</span>
+  {% endif %} — a browser front end for
   <a href="https://github.com/entropia/tip-toi-reveng" target="_blank" rel="noopener">tip-toi-reveng</a>.
 </footer>
 {% block scripts %}{% endblock %}

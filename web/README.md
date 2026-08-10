@@ -77,6 +77,12 @@ $ docker compose -f docker-compose.ghcr.yml up -d
 The workflow builds `linux/amd64` only — compiling tttool for arm64 under
 emulation takes hours, so build the image on the ARM machine itself instead.
 
+Pick a channel with `TTTOOL_IMAGE` in `.env`: `:latest` for releases, `:beta`
+for the next version if you are willing to report what breaks, `:edge` for
+every merge. [RELEASING.md](RELEASING.md) explains the channels, how to report
+a beta problem and how a release is cut; [ROADMAP.md](ROADMAP.md) is where this
+is going — a book editor that needs no technical knowledge at all.
+
 
 Where your data lives
 ---------------------

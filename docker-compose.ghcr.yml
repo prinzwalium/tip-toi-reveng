@@ -6,6 +6,9 @@
 #   mv .env.example .env && edit it
 #   docker compose -f docker-compose.ghcr.yml up -d
 #
+# Set TTTOOL_IMAGE in .env to pick a channel: :latest (releases), :beta (the
+# next version, for testing) or :edge (every merge). See web/RELEASING.md.
+#
 # The registry is public for public repositories; for a private one, log in
 # first: echo $GITHUB_TOKEN | docker login ghcr.io -u <user> --password-stdin
 
