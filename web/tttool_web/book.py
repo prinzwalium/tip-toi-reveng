@@ -34,7 +34,13 @@ DEFAULT_PAPER = "a4-landscape"
 MIN_AREA_MM = 10.0
 #: Size and margin of the power-on field that every page carries.
 POWER_FIELD_MM = 20.0
-POWER_FIELD_MARGIN_MM = 8.0
+#: How close to the edge an area may come before the printer is likely to cut
+#: it. Most printers manage 4-5 mm; this is that with room to spare.
+EDGE_MARGIN_MM = 10.0
+#: Distance of the power-on field from the edges. Printers cannot reach the
+#: last few millimetres of a sheet, and a half printed power-on field is a
+#: book that never switches on.
+POWER_FIELD_MARGIN_MM = 12.0
 
 #: What an area can do. The interface offers exactly these.
 BEHAVIOURS = ("play", "random", "sequence", "answer", "collect", "advanced")
@@ -608,6 +614,7 @@ class Book:
         hints: list[str] = []
         px, py, pw, ph = self.power_field
         power = Area(id="power", x=px, y=py, w=pw, h=ph)
+        page_w, page_h = self.page_size
 
         for page in self.pages:
             label = page.name or page.id
@@ -635,6 +642,17 @@ class Book:
                     hints.append(
                         t("“{name}” on “{label}” lies on the power-on field and will not work there.",
                           name=name, label=label)
+                    )
+                if (
+                    area.x < EDGE_MARGIN_MM
+                    or area.y < EDGE_MARGIN_MM
+                    or area.x + area.w > page_w - EDGE_MARGIN_MM
+                    or area.y + area.h > page_h - EDGE_MARGIN_MM
+                ):
+                    hints.append(
+                        t("“{name}” on “{label}” reaches into the {size} mm at the edge that "
+                          "many printers cannot print — that part will be missing.",
+                          name=name, label=label, size=f"{EDGE_MARGIN_MM:.0f}")
                     )
             for i, area in enumerate(page.areas):
                 for other in page.areas[i + 1 :]:

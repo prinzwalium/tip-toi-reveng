@@ -105,9 +105,6 @@
   "Print test page first": "Erst die Druckprobe drucken",
   "Print test": "Druckprobe",
   "1. Print this page at 100% — never “fit to page”.": "1. Diese Seite mit 100 % ausdrucken – niemals „an Seite anpassen“.",
-  "2. Check the 50 mm line below with a ruler.": "2. Die 50-mm-Linie unten mit dem Lineal nachmessen.",
-  "3. Switch the pen on with the field on the left.": "3. Den Stift mit dem Feld links anschalten.",
-  "4. Tap the squares. The smallest one that answers is your minimum size.": "4. Auf die Quadrate tippen. Das kleinste, das antwortet, ist deine Mindestgröße.",
   "“{name}” on “{label}” sits on a dark part of the picture — the pen may not read the dots there.": "„{name}“ auf „{label}“ liegt auf einer dunklen Stelle des Bildes – der Stift kann die Punkte dort möglicherweise nicht lesen.",
   "Click the corners; click the first one again to close the shape.": "Ecken anklicken – zum Schließen noch einmal auf die erste Ecke klicken (oder Enter).",
   "Done": "Fertig",
@@ -460,5 +457,15 @@
   "too small": "zu klein",
   "“{name}” deleted.": "„{name}“ gelöscht.",
   "Nothing works, and the print looks perfect": "Nichts funktioniert, und der Ausdruck sieht perfekt aus",
-  "Pages printed with a version before 2.1.1 have the dot grid 1.6 % too tight and no pen can read them. Build the book again and print the new PDF; the file on the pen is fine.": "Seiten, die mit einer Version vor 2.1.1 gedruckt wurden, haben das Punktraster 1,6 % zu eng – kein Stift kann sie lesen. Erstelle das Buch neu und drucke das neue PDF; die Datei auf dem Stift ist in Ordnung."
+  "Pages printed with a version before 2.1.1 have the dot grid 1.6 % too tight and no pen can read them. Build the book again and print the new PDF; the file on the pen is fine.": "Seiten, die mit einer Version vor 2.1.1 gedruckt wurden, haben das Punktraster 1,6 % zu eng – kein Stift kann sie lesen. Erstelle das Buch neu und drucke das neue PDF; die Datei auf dem Stift ist in Ordnung.",
+  "2. The dashed frame has to be complete on all four sides.": "2. Der gestrichelte Rahmen muss auf allen vier Seiten vollständig sein.",
+  "3. Check the 50 mm line below with a ruler.": "3. Miss die 50-mm-Linie unten mit dem Lineal nach.",
+  "4. Switch the pen on with the field on the left.": "4. Schalte den Stift mit dem Feld links an.",
+  "5. Tap the squares. The smallest one that answers is your minimum size.": "5. Tippe die Quadrate an. Das kleinste, das antwortet, ist deine Mindestgröße.",
+  "“{name}” on “{label}” reaches into the {size} mm at the edge that many printers cannot print — that part will be missing.": "„{name}“ auf „{label}“ ragt in die {size} mm am Rand hinein, die viele Drucker nicht bedrucken können – dieser Teil fehlt dann.",
+  "Check that the dashed frame on the test page is complete on all four sides. No printer prints to the very edge of the sheet — usually the last 4 to 5 mm stay white.": "Prüfe, ob der gestrichelte Rahmen auf der Druckprobe an allen vier Seiten vollständig ist. Kein Drucker druckt bis an den Rand des Blattes – meist bleiben die letzten 4 bis 5 mm weiß.",
+  "Something at the edge of the sheet is missing": "Am Rand des Blattes fehlt etwas",
+  "That is the printer's own margin, not a mistake in the file: the last few millimetres cannot be printed. Everything this program places keeps 12 mm clear, so if something of yours is cut off, move it further in — an area that reaches into the edge is marked before you print.": "Das ist der Rand, den der Drucker selbst frei lässt, kein Fehler in der Datei: Die letzten Millimeter lassen sich nicht bedrucken. Alles, was dieses Programm setzt, hält 12 mm Abstand. Wird etwas von dir abgeschnitten, rücke es weiter nach innen – ein Feld, das in den Rand ragt, wird vor dem Drucken angezeigt.",
+  "Cut off, but not shrunk — is that bad?": "Abgeschnitten, aber nicht verkleinert – ist das schlimm?",
+  "It is the good case: a page that comes out cut off was printed at its true size. A page that fits everything in but reads 48 mm on the 50 mm line was scaled down, and no pen will read it.": "Das ist der gute Fall: Eine Seite, die abgeschnitten herauskommt, wurde in echter Größe gedruckt. Eine Seite, auf der alles draufpasst, deren 50-mm-Linie aber 48 mm misst, wurde verkleinert – und die liest kein Stift."
 }

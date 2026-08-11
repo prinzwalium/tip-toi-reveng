@@ -7,6 +7,31 @@ YYYY-MM-DD.
 Unreleased
 ----------
 
+2.1.2 — out of the printer's dead zone
+--------------------------------------
+
+The first print test also came out with pieces missing at the edges, the 50 mm
+ruler mark among them. That is not the printer misbehaving: no consumer printer
+prints to the edge of the sheet, and four to five millimetres all round stay
+white. This program was putting things there.
+
+* The ruler mark sat **4 mm from the bottom edge**, with its end ticks reaching
+  to 2.5 mm — inside the dead zone of essentially every printer. The one mark
+  that proves the print was not scaled was the first thing to be cut off.
+  Everything the program places now keeps **12 mm** clear.
+* The power-on field moved from 8 mm to the same 12 mm. Half a power-on field
+  is a book that never switches on.
+* The test page gained a **dashed frame at that margin**. If it comes out
+  complete on all four sides, the printer reaches far enough for everything
+  else on the page — worth knowing from one sheet rather than from a finished
+  book.
+* An area you place yourself within 10 mm of the edge is now flagged before
+  printing, the same way areas that are too small are.
+* `/hilfe/stift` explains the margin, and says the thing that is easy to get
+  backwards: a page that comes out **cut off was printed at true size**. It is
+  a page where everything fits but the 50 mm line measures 48 that has been
+  scaled down — and that is the one no pen can read.
+
 2.1.1 — the dots were 1.6 % too tight
 -------------------------------------
 

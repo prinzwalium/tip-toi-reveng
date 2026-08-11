@@ -46,6 +46,12 @@ UNITS_PER_MM = PATTERN_CELL_UNITS / OID_CELL_MM
 #: unaffected; this is only the artwork a human looks at.
 PRINT_JPEG_QUALITY = 85
 
+#: No consumer printer prints to the edge of the sheet — four to five
+#: millimetres all round is normal, more at the bottom on some. Anything this
+#: program puts on the page stays inside this margin, so that it is not the
+#: printer that decides whether the ruler mark or the power-on field exists.
+SAFE_MARGIN_MM = 12.0
+
 PRINT_DIR = "druck"
 YAML_FILE = "book.yaml"
 GME_FILE = "buch.gme"
@@ -259,16 +265,25 @@ def compose_test_svg(
             f'font-size="{size * u}" font-weight="{weight}" fill="black">{escape(content)}</text>'
         )
 
+    m = SAFE_MARGIN_MM
     body = [
+        # A frame at the margin everything else keeps to. If a printer cuts
+        # this off, it would have cut off the power-on field too — which is
+        # worth knowing from one sheet rather than from a finished book.
+        f'<rect x="{m * u:.1f}" y="{m * u:.1f}" '
+        f'width="{(page_w - 2 * m) * u:.1f}" height="{(page_h - 2 * m) * u:.1f}" '
+        f'fill="none" stroke="black" stroke-width="{0.3 * u}" '
+        f'stroke-dasharray="{3 * u} {2 * u}"/>',
         text(15, 20, 6, t("Print test"), "bold"),
         text(15, 27, 3.4, t("1. Print this page at 100% — never “fit to page”.")),
-        text(15, 32, 3.4, t("2. Check the 50 mm line below with a ruler.")),
-        text(15, 37, 3.4, t("3. Switch the pen on with the field on the left.")),
-        text(15, 42, 3.4, t("4. Tap the squares. The smallest one that answers is your minimum size.")),
+        text(15, 32, 3.4, t("2. The dashed frame has to be complete on all four sides.")),
+        text(15, 37, 3.4, t("3. Check the 50 mm line below with a ruler.")),
+        text(15, 42, 3.4, t("4. Switch the pen on with the field on the left.")),
+        text(15, 47, 3.4, t("5. Tap the squares. The smallest one that answers is your minimum size.")),
     ]
 
     # The power-on field, so the pen can be switched on from this page alone.
-    px, py = 15.0, 52.0
+    px, py = 15.0, 57.0
     if "START" in patterns:
         body.append(
             f'<rect x="{px * u}" y="{py * u}" width="{20 * u}" height="{20 * u}" fill="white"/>'
@@ -299,15 +314,22 @@ def compose_test_svg(
 
 
 def _ruler_svg(page_w: float, page_h: float, u: int) -> str:
-    """A 50 mm line: if it does not measure 50 mm, the print was scaled."""
-    y = page_h - 4
+    """A 50 mm line: if it does not measure 50 mm, the print was scaled.
+
+    Kept a safe distance from the edge. At four millimetres it was inside the
+    margin most printers cannot reach, so the one mark that proves the scale
+    was the first thing to be cut off.
+    """
+    y = page_h - SAFE_MARGIN_MM
+    right = page_w - SAFE_MARGIN_MM
+    left = right - 50
     return (
         f'<g stroke="black" stroke-width="{0.25 * u}">'
-        f'<line x1="{(page_w - 58) * u}" y1="{y * u}" x2="{(page_w - 8) * u}" y2="{y * u}"/>'
-        f'<line x1="{(page_w - 58) * u}" y1="{(y - 1.5) * u}" x2="{(page_w - 58) * u}" y2="{(y + 1.5) * u}"/>'
-        f'<line x1="{(page_w - 8) * u}" y1="{(y - 1.5) * u}" x2="{(page_w - 8) * u}" y2="{(y + 1.5) * u}"/>'
+        f'<line x1="{left * u}" y1="{y * u}" x2="{right * u}" y2="{y * u}"/>'
+        f'<line x1="{left * u}" y1="{(y - 1.5) * u}" x2="{left * u}" y2="{(y + 1.5) * u}"/>'
+        f'<line x1="{right * u}" y1="{(y - 1.5) * u}" x2="{right * u}" y2="{(y + 1.5) * u}"/>'
         f"</g>"
-        f'<text x="{(page_w - 58) * u}" y="{(y - 2.5) * u}" font-family="{FONT}" '
+        f'<text x="{left * u}" y="{(y - 2.5) * u}" font-family="{FONT}" '
         f'font-size="{2.8 * u}" fill="black">{escape(t("50 mm — check with a ruler"))}</text>'
     )
 
