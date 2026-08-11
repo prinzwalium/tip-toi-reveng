@@ -29,9 +29,18 @@ from .pictures import picture_pixels, print_copy
 from .projects import Project
 from .runner import run
 
-#: tttool draws its patterns on a grid of 48 units per millimetre. The page has
-#: to use the same unit or the dots come out at the wrong size.
-UNITS_PER_MM = 48
+#: One cell of the OID grid is 1/25 inch across — four dots at 1/100 inch —
+#: and tttool draws that cell as a 48 unit tile. One SVG unit is therefore
+#: 1/1200 inch, and a millimetre is 47.24 units.
+#:
+#: Not 48. tttool's SVG header says width="30mm" for a 1440 unit code, but
+#: 1440 units are 30.48 mm; the header is rounded. Taking it at face value
+#: prints the dot grid 1.6 % too tight — a page that looks perfect, measures
+#: 50 mm on the ruler, and that no pen can read. Its own PDF output tiles at
+#: 2.88 pt = 1.016 mm, which is what this has to reproduce.
+OID_CELL_MM = 25.4 / 25          # one cell of the dot grid, 1.016 mm
+PATTERN_CELL_UNITS = 48          # how tttool draws that cell
+UNITS_PER_MM = PATTERN_CELL_UNITS / OID_CELL_MM
 
 #: Quality of the page picture inside the PDF. The dots are vector and
 #: unaffected; this is only the artwork a human looks at.
@@ -106,18 +115,27 @@ def _yaml_string(value: str) -> str:
 # ------------------------------------------------------------ the patterns
 
 
-def _read_patterns(directory: Path) -> dict[str, str]:
-    """{script name: <pattern> element} from the files tttool just wrote."""
+def _read_patterns(directory: Path) -> tuple[dict[str, str], float]:
+    """{script name: <pattern> element}, and how many units one cell is.
+
+    The cell size comes from the file rather than from our constant, so that a
+    future tttool drawing its tiles differently changes the scale of the page
+    with it instead of printing an unreadable one.
+    """
     patterns: dict[str, str] = {}
+    cell = float(PATTERN_CELL_UNITS)
     for path in directory.glob("oid-*.svg"):
         match = re.search(r"<pattern.*?</pattern>", path.read_text(encoding="utf-8"), re.S)
         if not match:
             continue
+        width = re.search(r'<pattern[^>]*\swidth="([0-9.]+)"', match.group(0))
+        if width:
+            cell = float(width.group(1))
         # oid-<product>-<name>.svg
         name = path.stem.split("-", 2)[-1]
         # tttool's own ids may start with a digit, which no XML name may do.
         patterns[name] = re.sub(r'id="[^"]*"', f'id="oid-{name}"', match.group(0), count=1)
-    return patterns
+    return patterns, cell / OID_CELL_MM
 
 
 def _codes_from_yaml(project: Project, book: Book) -> dict[str, int]:
@@ -155,7 +173,8 @@ def _shape(area, fill: str, u: int, extra: str = "") -> str:
 
 
 def compose_page_svg(
-    project: Project, book: Book, page: Page, patterns: dict[str, str]
+    project: Project, book: Book, page: Page, patterns: dict[str, str],
+    units_per_mm: float = UNITS_PER_MM,
 ) -> tuple[str, tuple[int, int] | None]:
     """One printable page: picture, painted areas, power-on field.
 
@@ -163,7 +182,7 @@ def compose_page_svg(
     is what lets the PDF step find that one image again.
     """
     page_w, page_h = book.page_size
-    u = UNITS_PER_MM
+    u = units_per_mm
 
     used = {
         book.script_name(page, area): area
@@ -220,7 +239,10 @@ def compose_page_svg(
 TEST_SIZES = (8, 10, 12, 15, 20, 30)
 
 
-def compose_test_svg(book: Book, patterns: dict[str, str], sample: str) -> str:
+def compose_test_svg(
+    book: Book, patterns: dict[str, str], sample: str,
+    units_per_mm: float = UNITS_PER_MM,
+) -> str:
     """A page to print before the book: does this printer produce readable dots?
 
     The same code is drawn at several sizes, so the user finds out what their
@@ -228,7 +250,7 @@ def compose_test_svg(book: Book, patterns: dict[str, str], sample: str) -> str:
     scaled, which is the mistake that silently ruins everything else.
     """
     page_w, page_h = book.page_size
-    u = UNITS_PER_MM
+    u = units_per_mm
     defs = "".join(patterns[name] for name in {sample, "START"} if name in patterns)
 
     def text(x, y, size, content, weight="normal"):
@@ -393,14 +415,14 @@ def build(project: Project, book: Book) -> BuildResult:
             log="\n".join(log),
         )
 
-    patterns = _read_patterns(codes_dir)
+    patterns, units_per_mm = _read_patterns(codes_dir)
     code_numbers = _codes_from_yaml(project, book)
 
     page_files: list[str] = []
     pdf_parts: list[Path] = []
     codes: list[tuple[str, str, int]] = []
     for index, page in enumerate(book.pages, start=1):
-        svg, picture_size = compose_page_svg(project, book, page, patterns)
+        svg, picture_size = compose_page_svg(project, book, page, patterns, units_per_mm)
         svg_path = print_dir / f"seite-{index}.svg"
         svg_path.write_text(svg, encoding="utf-8")
         pdf_path = print_dir / f"seite-{index}.pdf"
@@ -432,7 +454,9 @@ def build(project: Project, book: Book) -> BuildResult:
     )
     if sample:
         test_svg = print_dir / "druckprobe.svg"
-        test_svg.write_text(compose_test_svg(book, patterns, sample), encoding="utf-8")
+        test_svg.write_text(
+            compose_test_svg(book, patterns, sample, units_per_mm), encoding="utf-8"
+        )
         try:
             _svg_to_pdf(test_svg, print_dir / "druckprobe.pdf")
             test_pdf = project.relpath_of(print_dir / "druckprobe.pdf")

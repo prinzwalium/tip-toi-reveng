@@ -7,6 +7,32 @@ YYYY-MM-DD.
 Unreleased
 ----------
 
+2.1.1 — the dots were 1.6 % too tight
+-------------------------------------
+
+**Every page printed before this version has to be printed again.** The file
+for the pen is unaffected — only the paper was wrong. Open the book, press
+*Buch erstellen*, print the new PDF.
+
+The first real print test failed: correct paper size, ruler said 50 mm, and the
+pen ignored every field. The cause was a rounding in tttool's SVG output taken
+at face value here. A code is written as `width="30mm" viewBox="0 0 1440 1440"`,
+which reads as 48 units per millimetre — but 1440 of those units are 30.48 mm,
+not 30. One unit is 1/1200 inch, so a millimetre is 47.244 units.
+
+Printing the dot grid at 48 units/mm made it **1.6 % too tight**: 1.000 mm per
+cell of the OID grid instead of 1.016 mm. Everything a person can check looked
+right, which is exactly why it took a sheet of paper to find.
+
+* The page is now drawn at 47.244 units per millimetre, and the scale is
+  derived from the pattern tttool actually emits rather than assumed, so a
+  future tttool that draws its tiles differently moves the page with it.
+* Measured against tttool's own PDF output, which tiles at 2.88 pt: ours now
+  tiles at 2.88 pt too, on both the book page and the test page.
+* Two tests check that number through the whole pipeline, and the image smoke
+  test measures it in the container on every build. Nothing about a page's
+  appearance would have caught this; the number is the only witness.
+
 2.1.0 — every area in a list
 ----------------------------
 

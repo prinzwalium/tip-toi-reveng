@@ -458,5 +458,7 @@
   "Sound …": "Ton …",
   "Undo": "Rückgängig",
   "too small": "zu klein",
-  "“{name}” deleted.": "„{name}“ gelöscht."
+  "“{name}” deleted.": "„{name}“ gelöscht.",
+  "Nothing works, and the print looks perfect": "Nichts funktioniert, und der Ausdruck sieht perfekt aus",
+  "Pages printed with a version before 2.1.1 have the dot grid 1.6 % too tight and no pen can read them. Build the book again and print the new PDF; the file on the pen is fine.": "Seiten, die mit einer Version vor 2.1.1 gedruckt wurden, haben das Punktraster 1,6 % zu eng – kein Stift kann sie lesen. Erstelle das Buch neu und drucke das neue PDF; die Datei auf dem Stift ist in Ordnung."
 }

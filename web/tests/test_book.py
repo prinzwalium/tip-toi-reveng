@@ -416,7 +416,11 @@ def test_a_polygon_is_printed_as_a_polygon(client):
     result = client.post(f"/b/{name}/build").get_json()
     assert result["ok"], result
     svg = (client.data_dir / name / "druck" / "seite-1.svg").read_text()
-    assert '<polygon points="960.0,1440.0' in svg  # 20 mm * 48 units, 30 mm * 48
+    # The first corner sits at 20 mm / 30 mm, whatever the unit scale is.
+    from tttool_web.bookbuild import UNITS_PER_MM
+
+    first = f"{20 * UNITS_PER_MM:.1f},{30 * UNITS_PER_MM:.1f}"
+    assert f'<polygon points="{first}' in svg
     assert 'fill="url(#oid-s1_a1)"' in svg
 
 
@@ -1245,3 +1249,47 @@ def test_the_editor_lists_every_area_of_the_page(client):
         assert needed in strings, needed
     # deleting an area is undoable, so it no longer asks first
     assert "Delete this area?" not in strings
+
+
+def test_the_dots_are_printed_at_the_pitch_the_pen_expects(client):
+    """The one measurement that decides whether a printed page works at all.
+
+    One cell of the OID grid is 1/25 inch — 2.88 pt, 1.016 mm — and tttool's
+    own PDF output tiles at exactly that. A page that tiles at 1.000 mm looks
+    perfect, measures 50 mm on the ruler, and no pen can read it.
+    """
+    name = make_book(client)
+    put_areas(client, name, [{"id": "a1", "name": "Hund", "x": 20, "y": 20, "w": 40, "h": 30}])
+    add_sound(client, name, "a1")
+    result = client.post(f"/b/{name}/build").get_json()
+    assert result["ok"], result
+
+    from pypdf import PdfReader
+
+    for relpath in (result["pages"][0], result["test_pdf"]):
+        page = PdfReader(str(client.data_dir / name / relpath)).pages[0]
+        patterns = page["/Resources"]["/Pattern"]
+        assert patterns, relpath
+        for _, ref in patterns.items():
+            tile = ref.get_object()
+            matrix = [float(v) for v in (tile.get("/Matrix") or [1, 0, 0, 1, 0, 0])]
+            step = float(tile.get("/XStep")) * abs(matrix[0])
+            assert abs(step - 2.88) < 0.005, f"{relpath}: {step} pt per cell, expected 2.88"
+
+
+def test_the_page_scale_does_not_depend_on_our_constant(client):
+    """The unit scale is read from tttool's pattern, not assumed."""
+    from tttool_web.bookbuild import OID_CELL_MM, UNITS_PER_MM, _read_patterns
+
+    # 48 units per 1/25 inch cell — a millimetre is 47.24 units, not 48.
+    assert abs(UNITS_PER_MM - 1200 / 25.4) < 0.001
+    assert abs(OID_CELL_MM - 1.016) < 0.0001
+
+    name = make_book(client)
+    put_areas(client, name, [{"id": "a1", "name": "Hund", "x": 20, "y": 20, "w": 40, "h": 30}])
+    add_sound(client, name, "a1")
+    client.post(f"/b/{name}/build")
+
+    patterns, units = _read_patterns(client.data_dir / name / "druck" / "codes")
+    assert patterns
+    assert abs(units - UNITS_PER_MM) < 0.001
