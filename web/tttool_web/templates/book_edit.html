@@ -83,6 +83,17 @@
     <p class="muted hint keyboard-hint">
       {{ t("Without a mouse: the tab key jumps from area to area, the arrow keys move the selected one, + and − change its size. Hold shift to go in bigger steps.") }}
     </p>
+
+    <div class="area-list-box">
+      <h2>
+        {{ t("Areas on this page") }}
+        <span class="muted" id="area-count"></span>
+      </h2>
+      <p class="muted hint">
+        {{ t("Every area of this page, whether or not you can see it. Useful for the tiny one you created by accident.") }}
+      </p>
+      <ul id="area-list" class="area-list"></ul>
+    </div>
   </section>
 
   <section class="card book-side">
@@ -187,6 +198,8 @@
     </div>
   </section>
 </div>
+
+<div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
 <div id="sound-modal" class="modal hidden">
   <div class="modal-inner sound-picker">

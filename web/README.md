@@ -27,6 +27,11 @@ A strip above the editor shows which of those steps you are on.
 thing with pictures, and *Auf den Stift* (`/hilfe/stift`) covers printing and
 copying — including what to check when the pen stays silent.
 
+Under the picture is a list of every area of the page — name, sound, and a
+button each to listen, change the sound or delete it. That is the way to reach
+an area too small to click, or one hidden under another. Deleting from either
+place offers *Rückgängig* rather than asking first.
+
 The editor needs no mouse: the tab key walks the areas of a page, the arrow
 keys move the selected one, `+` and `−` resize it, and shift makes the steps
 bigger. Every area carries a label for screen readers.

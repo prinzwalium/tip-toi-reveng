@@ -7,6 +7,24 @@ YYYY-MM-DD.
 Unreleased
 ----------
 
+2.1.0 — every area in a list
+----------------------------
+
+Finding an area on the page only works when you can see it. An area three
+millimetres wide, or one sitting underneath another, was effectively
+unreachable — and those are exactly the ones you want to get rid of.
+
+* **A list of every area of the page**, under the picture: name, its sound,
+  and per row a button to listen, to change the sound, and to delete. Pointing
+  at a row lights the area up on the page; clicking the name selects it.
+* Areas too small for the pen are marked *zu klein* in the list, and ones
+  without a sound say so — so the two things that would otherwise be found by
+  the check before printing are visible while you work.
+* **Deleting an area no longer asks.** It is undoable, and this program's own
+  rule is that only what cannot be undone asks first. Instead it says what it
+  deleted and offers *Rückgängig* right there — which is what made clearing
+  away several stray areas tedious.
+
 2.0.0 — the finished product
 ----------------------------
 

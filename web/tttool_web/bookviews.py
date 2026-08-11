@@ -38,7 +38,6 @@ JS_STRINGS = [
     "Saved",
     "Saving …",
     "Could not save — is the server still running?",
-    "Delete this area?",
     "Building …",
     "Area",
     "No sound yet — the area stays silent.",
@@ -72,6 +71,12 @@ JS_STRINGS = [
     "Area {name}, {x} by {y} millimetres, {sound}",
     "plays {sound}",
     "no sound yet",
+    "No areas yet — drag one onto the picture.",
+    "too small",
+    "Sound …",
+    "Delete area",
+    "“{name}” deleted.",
+    "Undo",
 ]
 
 

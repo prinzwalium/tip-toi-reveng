@@ -382,3 +382,42 @@ span[data-tip], code[data-tip], .kind[data-tip], label[data-tip] > .label { curs
 
 dl.cmdlist dt { margin-top: 10px; }
 dl.cmdlist dd { margin: 2px 0 0 18px; color: var(--muted); }
+
+/* The list of every area on the page — the way to reach one that is too
+   small, or hidden underneath another. */
+.area-list-box { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 12px; }
+.area-list-box h2 { margin: 0 0 4px; }
+.area-list { list-style: none; margin: 10px 0 0; padding: 0; }
+.area-list .empty { padding: 8px 2px; font-size: 14px; }
+.area-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 8px; border: 1px solid transparent; border-radius: 8px;
+  font-size: 14px;
+}
+.area-row:nth-child(odd) { background: color-mix(in srgb, var(--muted) 6%, transparent); }
+.area-row:hover { border-color: var(--line); }
+.area-row.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.area-row .area-pick {
+  background: none; border: none; padding: 0; font: inherit; font-weight: 600;
+  color: var(--ink); text-align: left; cursor: pointer; text-decoration: underline;
+  text-decoration-color: transparent;
+}
+.area-row .area-pick:hover { text-decoration-color: var(--accent); }
+.area-row .area-pick { min-width: 9em; }
+/* One column each, so the eye can run down the list instead of hunting. */
+.area-row .area-sound { font-size: 13px; flex: 1; min-width: 6em; }
+.area-row .area-sound.silent { color: var(--warn); }
+.area-row .badge.warn { background: none; color: var(--warn); border: 1px solid var(--warn); }
+.page-canvas .area.highlight rect,
+.page-canvas .area.highlight polygon { stroke-width: 1.4; fill: rgba(31, 111, 235, .34); }
+
+/* Says what just happened, and offers to take it back. */
+.toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+  z-index: 40; display: flex; align-items: center; gap: 10px;
+  background: var(--panel); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 14px; font-size: 14px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .18);
+}
+.toast button { font-size: 13px; padding: 3px 10px; }

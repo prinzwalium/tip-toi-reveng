@@ -65,7 +65,6 @@
   "Saved": "Gespeichert",
   "Saving …": "Speichern …",
   "Could not save — is the server still running?": "Konnte nicht speichern – läuft der Server noch?",
-  "Delete this area?": "Dieses Feld löschen?",
   "Building …": "Wird erstellt …",
   "Please give your book a name.": "Bitte gib deinem Buch einen Namen.",
   "Please choose a picture.": "Bitte wähle ein Bild aus.",
@@ -452,5 +451,12 @@
   "one page": "eine Seite",
   "{count} pages": "{count} Seiten",
   "Passing a book on, and backups": "Weitergeben und sichern",
-  "“Pass on” packs one book — pictures, sounds and all — into a single file that someone else can add to their own server with “Add book”. “Back up everything” does the same for every book at once; adding that file back restores all of them.": "„Weitergeben“ packt ein Buch – Bilder, Töne und alles andere – in eine einzige Datei, die jemand anderes mit „Buch hinzufügen“ auf dem eigenen Server ergänzen kann. „Alles sichern“ tut dasselbe für alle Bücher auf einmal; fügst du diese Datei wieder hinzu, sind alle zurück."
+  "“Pass on” packs one book — pictures, sounds and all — into a single file that someone else can add to their own server with “Add book”. “Back up everything” does the same for every book at once; adding that file back restores all of them.": "„Weitergeben“ packt ein Buch – Bilder, Töne und alles andere – in eine einzige Datei, die jemand anderes mit „Buch hinzufügen“ auf dem eigenen Server ergänzen kann. „Alles sichern“ tut dasselbe für alle Bücher auf einmal; fügst du diese Datei wieder hinzu, sind alle zurück.",
+  "Areas on this page": "Felder auf dieser Seite",
+  "Every area of this page, whether or not you can see it. Useful for the tiny one you created by accident.": "Alle Felder dieser Seite – auch die, die du nicht siehst. Praktisch für das winzige, das dir aus Versehen entstanden ist.",
+  "No areas yet — drag one onto the picture.": "Noch keine Felder – zieh eines auf dem Bild auf.",
+  "Sound …": "Ton …",
+  "Undo": "Rückgängig",
+  "too small": "zu klein",
+  "“{name}” deleted.": "„{name}“ gelöscht."
 }

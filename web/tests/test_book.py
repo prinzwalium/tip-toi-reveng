@@ -1227,3 +1227,21 @@ def test_an_old_book_without_a_preview_shows_its_original(client):
     assert book["pages"][0]["preview"] == ""
     assert book["pages"][0]["image"]
     assert client.get(f"/b/{name}").status_code == 200
+
+
+def test_the_editor_lists_every_area_of_the_page(client):
+    """The list is drawn in the browser, so check its plumbing is all there."""
+    name = make_book(client)
+    page = client.get(f"/b/{name}").data.decode()
+    assert 'id="area-list"' in page
+    assert 'id="area-count"' in page
+    assert 'id="toast"' in page
+
+    strings = json.loads(re.search(
+        r'<script id="book-strings" type="application/json">(.*?)</script>', page, re.S
+    ).group(1))
+    for needed in ("too small", "Sound …", "Delete area", "“{name}” deleted.", "Undo",
+                   "No areas yet — drag one onto the picture."):
+        assert needed in strings, needed
+    # deleting an area is undoable, so it no longer asks first
+    assert "Delete this area?" not in strings
