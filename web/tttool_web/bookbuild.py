@@ -249,11 +249,23 @@ def compose_test_svg(
     book: Book, patterns: dict[str, str], sample: str,
     units_per_mm: float = UNITS_PER_MM,
 ) -> str:
-    """A page to print before the book: does this printer produce readable dots?
+    """A page to print before the book. Each thing on it tests one thing.
 
-    The same code is drawn at several sizes, so the user finds out what their
-    printer manages — and the ruler mark tells them whether the print was
-    scaled, which is the mistake that silently ruins everything else.
+    The frame tests how far the printer reaches, the ruler mark tests the
+    scale, and the squares test how small an area may be.
+
+    The squares do *not* test the printer. Every one of them carries the same
+    code at the same dot size and spacing — a bigger square is simply more
+    repetitions of the same tile, since the pattern is tiled rather than
+    stretched. What changes with the size is how much patterned paper
+    surrounds the point the pen is put down on: the pen reads a small window
+    around its tip, and near the edge of a small square part of that window is
+    blank. So the ladder answers "how small can I draw an area and still hit
+    it reliably", not "can my printer do this".
+
+    Whether the printer can do it at all is the largest square: if that one
+    stays silent, no size will help and the problem is the printer or the
+    scale. The page says so.
     """
     page_w, page_h = book.page_size
     u = units_per_mm
@@ -279,11 +291,13 @@ def compose_test_svg(
         text(15, 32, 3.4, t("2. The dashed frame has to be complete on all four sides.")),
         text(15, 37, 3.4, t("3. Check the 50 mm line below with a ruler.")),
         text(15, 42, 3.4, t("4. Switch the pen on with the field on the left.")),
-        text(15, 47, 3.4, t("5. Tap the squares. The smallest one that answers is your minimum size.")),
+        text(15, 47, 3.4, t("5. Tap the squares, biggest first. All carry the same code.")),
+        text(15, 52, 3.4, t("   The smallest one that still answers reliably is the smallest area to use.")),
+        text(15, 57, 3.4, t("   If even the biggest stays silent, it is not the size — printer or scale.")),
     ]
 
     # The power-on field, so the pen can be switched on from this page alone.
-    px, py = 15.0, 57.0
+    px, py = 15.0, 68.0
     if "START" in patterns:
         body.append(
             f'<rect x="{px * u}" y="{py * u}" width="{20 * u}" height="{20 * u}" fill="white"/>'

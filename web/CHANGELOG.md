@@ -7,6 +7,32 @@ YYYY-MM-DD.
 Unreleased
 ----------
 
+2.1.3 — the test page said the wrong thing about itself
+-------------------------------------------------------
+
+The squares on the test page were labelled as if they told you what your
+printer manages. They do not, and saying so sent people looking in the wrong
+place when nothing worked.
+
+Every square carries the same code at the same dot size and the same spacing —
+the pattern is *tiled*, so a bigger square is simply more repetitions of the
+same 1.016 mm tile. Nothing about the printing differs between them. (tttool's
+`--pixel-size` does not change this either: its SVG output draws every dot as
+the same two units regardless.)
+
+What the ladder actually measures is **how small an area may be**. The pen
+reads a small window around its tip, so near the edge of a small square part of
+that window is blank paper, and there is less to decode. Together with having
+to hit the thing at all, that is what makes small areas unreliable — a property
+of the pen and of aim, not of the printer.
+
+* The page now says this on itself: tap biggest first, all squares carry the
+  same code, the smallest that still answers reliably is the smallest area
+  worth drawing — **and if even the biggest stays silent it is not the size but
+  the printer or the scale.** That last line is the one that would have saved a
+  wrong turn.
+* `/hilfe/stift` says the same, in place of the claim it made before.
+
 2.1.2 — out of the printer's dead zone
 --------------------------------------
 
