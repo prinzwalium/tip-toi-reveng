@@ -44,6 +44,7 @@ JS_STRINGS = [
     "Print this",
     "Copy this onto the pen",
     "Print test page first",
+    "Comparison sheet from tttool",
     "Delete this page with everything on it?",
     "Click the corners; click the first one again to close the shape.",
     "Done",
@@ -396,6 +397,11 @@ def register_book_routes(app, route, get_project):
         )
         payload["test_pdf_url"] = (
             url_for("download", name=project.name, path=result.test_pdf) if result.test_pdf else ""
+        )
+        payload["control_pdf_url"] = (
+            url_for("download", name=project.name, path=result.control_pdf)
+            if result.control_pdf
+            else ""
         )
         return jsonify(payload)
 

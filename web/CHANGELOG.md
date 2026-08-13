@@ -7,6 +7,24 @@ YYYY-MM-DD.
 Unreleased
 ----------
 
+2.2.0 — a control sheet drawn by tttool itself
+----------------------------------------------
+
+When a printed page is not read by the pen there are two possibilities and no
+way to tell them apart from one sheet: this program produced something wrong,
+or the printer cannot put dots this small on paper. Everything measurable about
+the file has now been checked against tttool's own output and matches it
+exactly — but "matches as far as I can measure" is not the same as "works".
+
+*Buch erstellen* therefore also writes **`druck/vergleich-tttool.pdf`**: the same
+codes for the same book, drawn by `tttool oid-table` rather than by this
+program. Print it and tap it.
+
+* If the control sheet is read and ours is not, the fault is here — and the
+  difference between the two files says where.
+* If neither is read, no change here will help: it is the printer, the toner or
+  the paper. That is worth knowing before another sheet is spent.
+
 2.1.3 — the test page said the wrong thing about itself
 -------------------------------------------------------
 

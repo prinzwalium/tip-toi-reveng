@@ -64,6 +64,9 @@ class BuildResult:
     gme: str = ""
     pdf: str = ""
     test_pdf: str = ""
+    #: The same codes drawn by tttool itself — the control for "is it me or
+    #: the printer?" when a page is not read.
+    control_pdf: str = ""
     pages: list[str] = None
     codes: list[tuple[str, str, int]] = None  # (page, area, code)
     problems: list[str] = None
@@ -76,6 +79,7 @@ class BuildResult:
             "gme": self.gme,
             "pdf": self.pdf,
             "test_pdf": self.test_pdf,
+            "control_pdf": self.control_pdf,
             "pages": self.pages or [],
             "codes": [{"page": p, "area": a, "code": c} for p, a, c in (self.codes or [])],
             "problems": self.problems or [],
@@ -504,12 +508,38 @@ def build(project: Project, book: Book) -> BuildResult:
         gme=GME_FILE,
         pdf=project.relpath_of(book_pdf),
         test_pdf=test_pdf,
+        control_pdf=_control_sheet(project, print_dir),
         pages=page_files,
         codes=codes,
         problems=[],
         hints=hints + book.dark_area_hints(project),
         log="\n".join(log),
     )
+
+
+def _control_sheet(project: Project, print_dir: Path) -> str:
+    """The same codes, drawn by tttool itself rather than by us.
+
+    When a printed page is not read by the pen there are two possibilities and
+    no way to tell them apart from a single sheet: this program produced
+    something wrong, or the printer cannot render dots this small. tttool's own
+    `oid-table` output is the control. If that sheet is not read either, no
+    change here will help — it is the printer or the paper.
+    """
+    target = print_dir / "vergleich-tttool.pdf"
+    result = run(
+        [
+            config.TTTOOL_BIN,
+            "--image-format", "pdf",
+            "--dpi", "1200",
+            "--pixel-size", "2",
+            "--code-dim", "30",
+            "oid-table", YAML_FILE,
+            f"{PRINT_DIR}/{target.name}",
+        ],
+        project.path,
+    )
+    return project.relpath_of(target) if result["ok"] and target.is_file() else ""
 
 
 def _slug(title: str) -> str:

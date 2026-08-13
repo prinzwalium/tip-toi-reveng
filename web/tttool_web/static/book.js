@@ -953,7 +953,8 @@
     done.className = "build-done";
     [[result.test_pdf_url, say("Print test page first"), result.test_pdf],
      [result.pdf_url, "1. " + say("Print this"), result.pdf],
-     [result.gme_url, "2. " + say("Copy this onto the pen"), result.gme]]
+     [result.gme_url, "2. " + say("Copy this onto the pen"), result.gme],
+     [result.control_pdf_url, say("Comparison sheet from tttool"), result.control_pdf]]
       .forEach(function (entry) {
         if (!entry[0]) return;
         var link = document.createElement("a");
