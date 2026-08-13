@@ -15,6 +15,7 @@ so a hand-crafted archive can at worst produce a nonsensical book, never a file
 outside its own project.
 """
 
+import io
 import json
 import zipfile
 from dataclasses import asdict
@@ -25,6 +26,7 @@ from .book import PAPER_SIZES, Book
 from .bookbuild import YAML_FILE
 from .config import config
 from .i18n import t
+from .pictures import make_preview
 from .projects import Project, ProjectError, unique_name
 
 #: The extension of an exported book. It is a ZIP file underneath, but the name
@@ -165,6 +167,9 @@ def _write_media(archive: zipfile.ZipFile, project: Project, book: Book) -> None
         page.image = _extract(
             archive, members, project, page.image, "seiten", page.id, PICTURE_SUFFIXES
         )
+        # The preview is derived, so it is neither exported nor trusted: the
+        # path in the manifest means nothing here. Make a fresh one.
+        page.preview = make_preview(project, page.image)
     for sound in book.sounds:
         sound.file = _extract(
             archive, members, project, sound.file, "sounds", sound.id, SOUND_SUFFIXES
@@ -230,6 +235,104 @@ def _copy_codes(archive: zipfile.ZipFile, project: Project) -> None:
 
 def is_book_archive(filename: str) -> bool:
     return bool(filename) and filename.lower().endswith(IMPORT_SUFFIXES)
+
+
+# ----------------------------------------------------------------- everything
+
+
+#: A backup is the same idea one level up: an archive of book archives.
+BACKUP_MANIFEST = "tiptoi-sicherung.json"
+BACKUP_FORMAT = "tttool-web-backup"
+BACKUP_DIR = "buecher"
+
+
+def backup_name() -> str:
+    from datetime import date
+
+    return f"tiptoi-sicherung-{date.today().isoformat()}{EXPORT_SUFFIX}"
+
+
+def export_all(books: list[tuple[Project, Book]], stream) -> int:
+    """Write every book to ``stream`` as one archive; returns how many."""
+    with zipfile.ZipFile(stream, "w", zipfile.ZIP_DEFLATED) as archive:
+        names = []
+        for project, book in books:
+            member = f"{BACKUP_DIR}/{project.name}{EXPORT_SUFFIX}"
+            # Each book is packed exactly as “pass this one on” packs it, so a
+            # backup can be opened with an unzip program and a single book
+            # pulled out of it by hand.
+            buffer = io.BytesIO()
+            export_book(project, book, buffer)
+            archive.writestr(member, buffer.getvalue())
+            names.append({"name": project.name, "title": book.title, "file": member})
+        archive.writestr(
+            BACKUP_MANIFEST,
+            json.dumps(
+                {
+                    "format": BACKUP_FORMAT,
+                    "version": MANIFEST_VERSION,
+                    "app": __version__,
+                    "books": names,
+                },
+                indent=2,
+                ensure_ascii=False,
+            ),
+        )
+    return len(books)
+
+
+def looks_like_backup(upload) -> bool:
+    """True for an archive holding several books rather than one."""
+    try:
+        position = upload.tell()
+    except (AttributeError, OSError):
+        position = None
+    try:
+        with zipfile.ZipFile(upload) as archive:
+            return BACKUP_MANIFEST in archive.namelist()
+    except (zipfile.BadZipFile, OSError):
+        return False
+    finally:
+        if position is not None:
+            upload.seek(position)
+
+
+def import_backup(upload) -> list[Project]:
+    """Add every book of a backup; returns the projects that were created."""
+    try:
+        archive = zipfile.ZipFile(upload)
+    except (zipfile.BadZipFile, OSError):
+        raise ProjectError(t("This file is damaged and cannot be opened.")) from None
+
+    restored: list[Project] = []
+    with archive:
+        _check_size(archive)
+        members = [
+            info
+            for info in archive.infolist()
+            if not info.is_dir()
+            and info.filename.startswith(f"{BACKUP_DIR}/")
+            and info.filename.lower().endswith(IMPORT_SUFFIXES)
+        ]
+        if not members:
+            raise ProjectError(t("This backup contains no books."))
+        for info in members:
+            with archive.open(info) as member:
+                # import_book wants something with a name to check; the inner
+                # archives are ordinary book files.
+                restored.append(import_book(_Named(io.BytesIO(member.read()), info.filename)))
+    return restored
+
+
+class _Named:
+    """An in-memory file that answers to ``.filename``, like an upload."""
+
+    def __init__(self, stream, filename: str):
+        self._stream = stream
+        self.filename = Path(filename).name
+
+    def __getattr__(self, item):
+        return getattr(self._stream, item)
 
 
 __all__ = [

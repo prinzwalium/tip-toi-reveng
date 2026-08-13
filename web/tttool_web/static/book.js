@@ -154,6 +154,75 @@
       });
     }
     renderSide();
+    renderAreaList();
+  }
+
+  //: Below this an area is hard for the pen to hit; the server checks the same.
+  var MIN_AREA_MM = 10;
+
+  // Every area of the page as a row, because an area three millimetres wide,
+  // or one hidden under another, cannot realistically be clicked on the page.
+  function renderAreaList() {
+    var list = document.getElementById("area-list");
+    var count = document.getElementById("area-count");
+    list.textContent = "";
+    count.textContent = "(" + currentPage.areas.length + ")";
+
+    if (!currentPage.areas.length) {
+      var empty = document.createElement("li");
+      empty.className = "muted empty";
+      empty.textContent = say("No areas yet — drag one onto the picture.");
+      list.appendChild(empty);
+      return;
+    }
+
+    currentPage.areas.forEach(function (a) {
+      var sound = soundOf(a);
+      var row = document.createElement("li");
+      row.className = "area-row" + (a.id === selectedId ? " selected" : "");
+      row.dataset.id = a.id;
+
+      var pick = document.createElement("button");
+      pick.type = "button";
+      pick.className = "area-pick";
+      pick.textContent = a.name || say("Area");
+      pick.addEventListener("click", function () { selectArea(a.id); });
+      row.appendChild(pick);
+
+      if (!isPolygon(a) && (a.w < MIN_AREA_MM || a.h < MIN_AREA_MM)) {
+        var small = document.createElement("span");
+        small.className = "badge warn";
+        small.textContent = say("too small");
+        row.appendChild(small);
+      }
+
+      var what = document.createElement("span");
+      what.className = "area-sound muted grow";
+      what.textContent = sound ? (sound.name || sound.id) : say("no sound yet");
+      if (!sound) what.classList.add("silent");
+      row.appendChild(what);
+
+      if (sound) {
+        row.appendChild(smallButton("▶", "ghost", function () { playFile(sound.file); }));
+      }
+      row.appendChild(
+        smallButton(say("Sound …"), "ghost", function () { chooseSoundFor(a); })
+      );
+      var remove = smallButton("×", "ghost danger", function () { removeArea(a); });
+      remove.setAttribute("aria-label", say("Delete area"));
+      row.appendChild(remove);
+
+      // Pointing at a row lights the area up on the page, which is how you
+      // find the one you are looking at.
+      row.addEventListener("mouseenter", function () { highlight(a.id, true); });
+      row.addEventListener("mouseleave", function () { highlight(a.id, false); });
+      list.appendChild(row);
+    });
+  }
+
+  function highlight(id, on) {
+    var node = areasLayer.querySelector('[data-id="' + id + '"]');
+    if (node) node.classList.toggle("highlight", on);
   }
 
   function renderSide() {
@@ -292,8 +361,12 @@
 
   function showPicture() {
     if (currentPage.image) {
-      picture.setAttributeNS("http://www.w3.org/1999/xlink", "href", url(urls.raw, currentPage.image));
-      picture.setAttribute("href", url(urls.raw, currentPage.image));
+      // The preview is a smaller copy of the same picture; the original stays
+      // on the server for printing. A book made before previews existed, or a
+      // picture too small to be worth shrinking, has none.
+      var shown = url(urls.raw, currentPage.preview || currentPage.image);
+      picture.setAttributeNS("http://www.w3.org/1999/xlink", "href", shown);
+      picture.setAttribute("href", shown);
       picture.style.display = "";
     } else {
       picture.style.display = "none";
@@ -599,13 +672,46 @@
   }
 
   document.getElementById("area-delete").addEventListener("click", function () {
-    var a = selected();
-    if (!a || !window.confirm(say("Delete this area?"))) return;
+    removeArea(selected());
+  });
+
+  // Deleting an area can be undone, so it does not ask first — it says what
+  // happened and offers to put it back, which is quicker than a dialog for
+  // the usual case: clearing away several areas drawn by accident.
+  function removeArea(a) {
+    if (!a) return;
+    var name = a.name || say("Area");
     snapshot();
     currentPage.areas = currentPage.areas.filter(function (other) { return other !== a; });
-    selectedId = null;
+    if (selectedId === a.id) selectedId = null;
     change();
-  });
+    toast(say("“{name}” deleted.").replace("{name}", name), say("Undo"), undo);
+  }
+
+  var toastTimer = null;
+  function toast(message, actionLabel, action) {
+    var box = document.getElementById("toast");
+    box.textContent = message + " ";
+    if (action) {
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "ghost";
+      button.textContent = actionLabel;
+      button.addEventListener("click", function () {
+        action();
+        hideToast();
+      });
+      box.appendChild(button);
+    }
+    box.classList.remove("hidden");
+    window.clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(hideToast, 8000);
+  }
+
+  function hideToast() {
+    window.clearTimeout(toastTimer);
+    document.getElementById("toast").classList.add("hidden");
+  }
 
   document.getElementById("add-area").addEventListener("click", function () {
     snapshot();
@@ -747,6 +853,7 @@
     flush().then(function () {
       post(url(urls.image, pageId), data, function (result) {
         currentPage.image = result.image;
+        currentPage.preview = result.preview || "";
         showPicture();
       });
     });
@@ -754,8 +861,14 @@
   });
 
   document.getElementById("sound-choose").addEventListener("click", function () {
-    var a = selected();
+    chooseSoundFor(selected());
+  });
+
+  function chooseSoundFor(a) {
     if (!a) return;
+    // Whichever way the picker was opened, the panel and the page now show
+    // the area the chosen sound is about to land on.
+    if (selectedId !== a.id) selectArea(a.id);
     flush().then(function () {
       window.SoundPicker.open(function (library, soundId) {
         if (library && library.sounds) book.sounds = library.sounds;
@@ -776,7 +889,7 @@
         });
       });
     });
-  });
+  }
 
   document.getElementById("sound-clear").addEventListener("click", function () {
     var a = selected();
@@ -840,7 +953,8 @@
     done.className = "build-done";
     [[result.test_pdf_url, say("Print test page first"), result.test_pdf],
      [result.pdf_url, "1. " + say("Print this"), result.pdf],
-     [result.gme_url, "2. " + say("Copy this onto the pen"), result.gme]]
+     [result.gme_url, "2. " + say("Copy this onto the pen"), result.gme],
+     [result.control_pdf_url, say("Comparison sheet from tttool"), result.control_pdf]]
       .forEach(function (entry) {
         if (!entry[0]) return;
         var link = document.createElement("a");

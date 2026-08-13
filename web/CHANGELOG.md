@@ -7,6 +7,151 @@ YYYY-MM-DD.
 Unreleased
 ----------
 
+2.2.0 — a control sheet drawn by tttool itself
+----------------------------------------------
+
+When a printed page is not read by the pen there are two possibilities and no
+way to tell them apart from one sheet: this program produced something wrong,
+or the printer cannot put dots this small on paper. Everything measurable about
+the file has now been checked against tttool's own output and matches it
+exactly — but "matches as far as I can measure" is not the same as "works".
+
+*Buch erstellen* therefore also writes **`druck/vergleich-tttool.pdf`**: the same
+codes for the same book, drawn by `tttool oid-table` rather than by this
+program. Print it and tap it.
+
+* If the control sheet is read and ours is not, the fault is here — and the
+  difference between the two files says where.
+* If neither is read, no change here will help: it is the printer, the toner or
+  the paper. That is worth knowing before another sheet is spent.
+
+2.1.3 — the test page said the wrong thing about itself
+-------------------------------------------------------
+
+The squares on the test page were labelled as if they told you what your
+printer manages. They do not, and saying so sent people looking in the wrong
+place when nothing worked.
+
+Every square carries the same code at the same dot size and the same spacing —
+the pattern is *tiled*, so a bigger square is simply more repetitions of the
+same 1.016 mm tile. Nothing about the printing differs between them. (tttool's
+`--pixel-size` does not change this either: its SVG output draws every dot as
+the same two units regardless.)
+
+What the ladder actually measures is **how small an area may be**. The pen
+reads a small window around its tip, so near the edge of a small square part of
+that window is blank paper, and there is less to decode. Together with having
+to hit the thing at all, that is what makes small areas unreliable — a property
+of the pen and of aim, not of the printer.
+
+* The page now says this on itself: tap biggest first, all squares carry the
+  same code, the smallest that still answers reliably is the smallest area
+  worth drawing — **and if even the biggest stays silent it is not the size but
+  the printer or the scale.** That last line is the one that would have saved a
+  wrong turn.
+* `/hilfe/stift` says the same, in place of the claim it made before.
+
+2.1.2 — out of the printer's dead zone
+--------------------------------------
+
+The first print test also came out with pieces missing at the edges, the 50 mm
+ruler mark among them. That is not the printer misbehaving: no consumer printer
+prints to the edge of the sheet, and four to five millimetres all round stay
+white. This program was putting things there.
+
+* The ruler mark sat **4 mm from the bottom edge**, with its end ticks reaching
+  to 2.5 mm — inside the dead zone of essentially every printer. The one mark
+  that proves the print was not scaled was the first thing to be cut off.
+  Everything the program places now keeps **12 mm** clear.
+* The power-on field moved from 8 mm to the same 12 mm. Half a power-on field
+  is a book that never switches on.
+* The test page gained a **dashed frame at that margin**. If it comes out
+  complete on all four sides, the printer reaches far enough for everything
+  else on the page — worth knowing from one sheet rather than from a finished
+  book.
+* An area you place yourself within 10 mm of the edge is now flagged before
+  printing, the same way areas that are too small are.
+* `/hilfe/stift` explains the margin, and says the thing that is easy to get
+  backwards: a page that comes out **cut off was printed at true size**. It is
+  a page where everything fits but the 50 mm line measures 48 that has been
+  scaled down — and that is the one no pen can read.
+
+2.1.1 — the dots were 1.6 % too tight
+-------------------------------------
+
+**Every page printed before this version has to be printed again.** The file
+for the pen is unaffected — only the paper was wrong. Open the book, press
+*Buch erstellen*, print the new PDF.
+
+The first real print test failed: correct paper size, ruler said 50 mm, and the
+pen ignored every field. The cause was a rounding in tttool's SVG output taken
+at face value here. A code is written as `width="30mm" viewBox="0 0 1440 1440"`,
+which reads as 48 units per millimetre — but 1440 of those units are 30.48 mm,
+not 30. One unit is 1/1200 inch, so a millimetre is 47.244 units.
+
+Printing the dot grid at 48 units/mm made it **1.6 % too tight**: 1.000 mm per
+cell of the OID grid instead of 1.016 mm. Everything a person can check looked
+right, which is exactly why it took a sheet of paper to find.
+
+* The page is now drawn at 47.244 units per millimetre, and the scale is
+  derived from the pattern tttool actually emits rather than assumed, so a
+  future tttool that draws its tiles differently moves the page with it.
+* Measured against tttool's own PDF output, which tiles at 2.88 pt: ours now
+  tiles at 2.88 pt too, on both the book page and the test page.
+* Two tests check that number through the whole pipeline, and the image smoke
+  test measures it in the container on every build. Nothing about a page's
+  appearance would have caught this; the number is the only witness.
+
+2.1.0 — every area in a list
+----------------------------
+
+Finding an area on the page only works when you can see it. An area three
+millimetres wide, or one sitting underneath another, was effectively
+unreachable — and those are exactly the ones you want to get rid of.
+
+* **A list of every area of the page**, under the picture: name, its sound,
+  and per row a button to listen, to change the sound, and to delete. Pointing
+  at a row lights the area up on the page; clicking the name selects it.
+* Areas too small for the pen are marked *zu klein* in the list, and ones
+  without a sound say so — so the two things that would otherwise be found by
+  the check before printing are visible while you work.
+* **Deleting an area no longer asks.** It is undoable, and this program's own
+  rule is that only what cannot be undone asks first. Instead it says what it
+  deleted and offers *Rückgängig* right there — which is what made clearing
+  away several stray areas tedious.
+
+2.0.0 — the finished product
+----------------------------
+
+Milestone 7 of `ROADMAP.md`, and the point of the whole exercise: a program you
+can hand to somebody who will never read this file. Nothing here is a new thing
+a book can do — it is what a tool needs before it can be recommended.
+
+* **Big pictures no longer cost what they used to.** An ordinary A4 scan at
+  300 dpi is 3508 × 2480 pixels, twelve megabytes as a PNG. It used to be sent
+  to the browser in full on every page, and embedded in the PDF as raw pixels.
+  Now the editor gets a small copy of its own, and the picture goes into the
+  PDF as JPEG at print resolution. Measured on one such page: the editor
+  downloads **12 MB → 0.5 MB**, and the printed PDF is **18 MB → 1.9 MB** at
+  unchanged resolution. The original is never modified — it is still what gets
+  printed from.
+  Only the artwork is compressed. The dots the pen reads are vector patterns
+  and are provably untouched: the code re-encodes exactly the one image whose
+  size it embedded, and a test checks the patterns are still there afterwards.
+* **Back up everything, restore everything.** *Alles sichern* packs every book
+  on the server into one file; adding that file back restores all of them.
+  Inside it is simply one `.tiptoi` per book, so a single book can be pulled
+  out of a backup with any unzip program.
+* **Books made by earlier versions keep working**, and there is now a test that
+  says so: a `book.json` in the 1.1 shape — no sound library, no behaviours, no
+  groups — opens, gets a library, and builds. A migrated sound is named "wau"
+  now rather than "wau.mp3".
+* **The project stops accumulating rubbish.** Deleting a page deletes its
+  picture (unless a duplicated page still uses it), and a book that loses a
+  page no longer keeps offering the printed page that went with it.
+* Proper plurals: "1 Seite(n)" was software talking. It says *eine Seite* and
+  *3 Seiten* now, in both languages.
+
 1.6.0 — sharing and finish
 --------------------------
 

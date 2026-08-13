@@ -205,16 +205,28 @@ Done when: a book made on one server can be opened and printed on another, and
 the interface is usable in German and by keyboard.
 
 
-Milestone 7 — 2.0, the finished product
----------------------------------------
+Milestone 7 — 2.0, the finished product ✅
+------------------------------------------
 
-*Target version 2.0*
+*Shipped in 2.0 · the promise that it is finished*
 
-Not new features but the promise that it is finished: stability under real use
-(large books, many sounds, slow machines), backup and restore, a migration path
-for projects made with earlier versions, and enough documentation that the tool
-explains itself. A release that can be recommended to a person who will never
-read this file.
+* **Stability under real use.** The measured problem was the page picture: an
+  ordinary 300 dpi scan meant 12 MB downloaded per page in the editor and an
+  18 MB PDF per printed page. The editor now works on a small preview and the
+  original is kept only for output — exactly as this file predicted it would
+  have to. Same page today: 0.5 MB to the editor, 1.9 MB of PDF, unchanged
+  resolution on paper.
+* **Backup and restore**: every book on the server in one file, and back again.
+* **A migration path**, with a test that opens a `book.json` in the shape 1.1
+  wrote and builds it.
+* **Documentation that explains itself**: *Erste Schritte*, *Auf den Stift* and
+  the command reference, all illustrated, all in German.
+
+What is still not verified is the one thing no test can reach: nobody has held
+a page printed by this program next to a pen. Everything up to the PDF is
+checked automatically — paper size, physical scale, dot pitch, and that the dot
+patterns survive every step — but the last centimetre is between a printer and
+a piece of paper.
 
 
 Decisions worth making early

@@ -416,7 +416,11 @@ def test_a_polygon_is_printed_as_a_polygon(client):
     result = client.post(f"/b/{name}/build").get_json()
     assert result["ok"], result
     svg = (client.data_dir / name / "druck" / "seite-1.svg").read_text()
-    assert '<polygon points="960.0,1440.0' in svg  # 20 mm * 48 units, 30 mm * 48
+    # The first corner sits at 20 mm / 30 mm, whatever the unit scale is.
+    from tttool_web.bookbuild import UNITS_PER_MM
+
+    first = f"{20 * UNITS_PER_MM:.1f},{30 * UNITS_PER_MM:.1f}"
+    assert f'<polygon points="{first}' in svg
     assert 'fill="url(#oid-s1_a1)"' in svg
 
 
@@ -557,7 +561,8 @@ def test_a_book_from_the_previous_format_gains_a_library(client):
     assert len(book["sounds"]) == 1
     sound = book["sounds"][0]
     assert sound["file"] == "sounds/a1.ogg"
-    assert sound["name"] == "wau.mp3"
+    # the old field held a file name; the library shows names
+    assert sound["name"] == "wau"
     # both areas end up on the same library entry
     assert [a["sound_id"] for a in book["pages"][0]["areas"]] == [sound["id"], sound["id"]]
 
@@ -991,3 +996,300 @@ def test_every_page_offers_the_language_switch_and_a_skip_link(client):
         assert 'href="#main"' in page, path
         assert 'action="/language"' in page, path
         assert 'id="main"' in page, path
+
+
+# -- large books ------------------------------------------------------------
+
+
+def big_picture(width=2400, height=1700):
+    """A picture that does not compress away, like a real scan."""
+    Image = pytest.importorskip("PIL.Image")
+    import random
+
+    random.seed(3)
+    small = Image.frombytes(
+        "RGB", (width // 8, height // 8),
+        bytes(random.getrandbits(8) for _ in range((width // 8) * (height // 8) * 3)),
+    )
+    buffer = io.BytesIO()
+    small.resize((width, height)).save(buffer, "PNG")
+    return buffer.getvalue()
+
+
+def upload_picture(client, name, page_id="s1", data=None, filename="seite.png"):
+    return client.post(
+        f"/b/{name}/pages/{page_id}/image",
+        data={"image": (io.BytesIO(data if data is not None else big_picture()), filename)},
+        content_type="multipart/form-data",
+    ).get_json()
+
+
+def test_the_editor_gets_a_small_copy_of_a_big_picture(client):
+    """A 300 dpi scan must not be downloaded in full just to draw on it."""
+    name = make_book(client)
+    original = big_picture()
+    result = upload_picture(client, name, data=original)
+
+    assert result["preview"] and result["preview"] != result["image"]
+    assert result["url"].endswith(result["preview"])
+    preview = client.data_dir / name / result["preview"]
+    assert preview.is_file()
+    assert preview.stat().st_size < len(original) / 5
+
+    from PIL import Image
+
+    with Image.open(preview) as shown:
+        assert max(shown.size) <= 1600
+    # the original is kept untouched: it is what gets printed
+    assert (client.data_dir / name / result["image"]).read_bytes() == original
+
+
+def test_a_small_picture_needs_no_second_copy(client):
+    name = make_book(client)
+    result = upload_picture(client, name, data=big_picture(200, 150))
+    assert result["preview"] == result["image"]
+    assert not list((client.data_dir / name / "seiten").glob("*vorschau*"))
+
+
+def test_replacing_a_picture_drops_the_old_copies(client):
+    name = make_book(client)
+    first = upload_picture(client, name)
+    assert (client.data_dir / name / first["preview"]).is_file()
+    second = upload_picture(client, name, data=big_picture(2000, 1400), filename="neu.jpg")
+    assert second["image"] == "seiten/s1.jpg"
+    # the .png and its derived copies are gone, only the new ones remain
+    left = sorted(p.name for p in (client.data_dir / name / "seiten").iterdir())
+    assert all(not n.endswith(".png") for n in left), left
+
+
+def test_the_printed_pdf_stays_small(client):
+    """The page picture goes into the PDF as JPEG, not as raw pixels."""
+    name = make_book(client)
+    upload_picture(client, name)
+    put_areas(client, name, [{"id": "a1", "name": "Hund", "x": 20, "y": 20, "w": 40, "h": 30}])
+    add_sound(client, name, "a1")
+
+    result = client.post(f"/b/{name}/build").get_json()
+    assert result["ok"], result
+    pdf = (client.data_dir / name / result["pdf"]).read_bytes()
+
+    # Raw pixels for this picture would be several megabytes; as JPEG it is
+    # a fraction of that, at the same resolution.
+    assert len(pdf) < 2_000_000, len(pdf)
+    assert b"/DCTDecode" in pdf
+
+    from pypdf import PdfReader
+
+    page = PdfReader(io.BytesIO(pdf)).pages[0]
+    assert abs(float(page.mediabox.width) / 72 * 25.4 - 297) < 1
+    # The dots are tiling patterns and must have survived untouched: one for
+    # the area, one for the power-on field.
+    assert len(page["/Resources"]["/Pattern"]) == 2
+
+
+def test_deleting_a_page_takes_its_picture_with_it(client):
+    name = make_book(client)
+    client.post(f"/b/{name}/pages")          # a second page, so the first may go
+    upload_picture(client, name)
+    seiten = client.data_dir / name / "seiten"
+    assert list(seiten.iterdir())
+
+    client.post(f"/b/{name}/pages/s1/delete")
+    assert not list(seiten.iterdir())
+
+
+def test_a_duplicated_page_keeps_the_shared_picture(client):
+    """Both pages point at one file — deleting one must not blind the other."""
+    name = make_book(client)
+    upload_picture(client, name)
+    copy = client.post(f"/b/{name}/pages/s1/duplicate").get_json()
+    image = next(p["image"] for p in copy["book"]["pages"] if p["id"] == copy["page"])
+    assert image
+
+    client.post(f"/b/{name}/pages/s1/delete")
+    assert (client.data_dir / name / image).is_file()
+
+
+def test_a_shrinking_book_does_not_keep_old_printed_pages(client):
+    name = make_book(client)
+    client.post(f"/b/{name}/pages")
+    book = client.get(f"/b/{name}/data").get_json()
+    for page in book["pages"]:
+        page["areas"] = [{"id": f"a{page['id']}", "name": "X", "x": 20, "y": 20, "w": 40, "h": 30}]
+    client.put(f"/b/{name}/data", json=book)
+    for page in book["pages"]:
+        add_sound(client, name, f"a{page['id']}")
+    assert client.post(f"/b/{name}/build").get_json()["ok"]
+    druck = client.data_dir / name / "druck"
+    assert sorted(p.name for p in druck.glob("seite-*.pdf")) == ["seite-1.pdf", "seite-2.pdf"]
+
+    client.post(f"/b/{name}/pages/{book['pages'][1]['id']}/delete")
+    assert client.post(f"/b/{name}/build").get_json()["ok"]
+    assert sorted(p.name for p in druck.glob("seite-*.pdf")) == ["seite-1.pdf"]
+
+
+# -- backup and restore -----------------------------------------------------
+
+
+def test_everything_can_be_backed_up_and_put_back(client):
+    pytest.importorskip("PIL")
+    first = make_book(client, "Bauernhof")
+    put_areas(client, first, [{"id": "a1", "name": "Hund", "x": 20, "y": 20, "w": 40, "h": 30}])
+    add_sound(client, first, "a1")
+    second = make_book(client, "Zoo")
+
+    backup = client.get("/books/backup")
+    assert backup.status_code == 200
+    assert ".tiptoi" in backup.headers["Content-Disposition"]
+
+    import zipfile
+
+    with zipfile.ZipFile(io.BytesIO(backup.data)) as archive:
+        names = archive.namelist()
+    assert "tiptoi-sicherung.json" in names
+    assert sorted(n for n in names if n.startswith("buecher/")) == [
+        "buecher/bauernhof.tiptoi",
+        "buecher/zoo.tiptoi",
+    ]
+
+    restored = import_archive(client, backup.data, "sicherung.tiptoi")
+    assert restored.status_code == 302
+    listed = client.get("/").data.decode()
+    for name in ("bauernhof", "bauernhof-2", "zoo", "zoo-2"):
+        assert name in listed, name
+
+    copy = client.get("/b/bauernhof-2/data").get_json()
+    assert [a["name"] for a in copy["pages"][0]["areas"]] == ["Hund"]
+    assert (client.data_dir / "bauernhof-2" / copy["sounds"][0]["file"]).is_file()
+
+
+def test_an_empty_server_says_there_is_nothing_to_back_up(client):
+    assert client.get("/books/backup", follow_redirects=True).status_code == 200
+    assert not list(client.data_dir.iterdir())
+
+
+# -- books made by earlier versions -----------------------------------------
+
+
+#: A book exactly as version 1.1 wrote it: no library, no behaviours, no
+#: groups, no preview — the sound file hangs off the area.
+BOOK_V1 = {
+    "title": "Altes Buch",
+    "product_id": 42,
+    "paper": "a4-landscape",
+    "pages": [
+        {
+            "id": "s1",
+            "name": "Seite 1",
+            "image": "seiten/s1.png",
+            "areas": [
+                {"id": "a1", "name": "Hund", "x": 20, "y": 20, "w": 40, "h": 30,
+                 "sound": "sounds/a1.ogg", "sound_name": "wau.mp3"},
+                {"id": "a2", "name": "Stumm", "x": 80, "y": 20, "w": 40, "h": 30},
+            ],
+        }
+    ],
+    "version": 1,
+}
+
+
+def test_a_book_from_an_earlier_version_still_opens_and_builds(client):
+    name = make_book(client, "Altes Buch")
+    project = client.data_dir / name
+    (project / "sounds").mkdir(exist_ok=True)
+    (project / "sounds" / "a1.ogg").write_bytes(b"OggS old")
+    upload_picture(client, name)
+    (project / "book.json").write_text(json.dumps(BOOK_V1), encoding="utf-8")
+
+    assert client.get(f"/b/{name}").status_code == 200
+    book = client.get(f"/b/{name}/data").get_json()
+
+    # The area's own sound has become a library entry, still pointing at the
+    # very same file, and the silent area is still silent.
+    assert len(book["sounds"]) == 1
+    sound = book["sounds"][0]
+    assert sound["file"] == "sounds/a1.ogg"
+    assert sound["name"] == "wau"
+    areas = {a["name"]: a for a in book["pages"][0]["areas"]}
+    assert areas["Hund"]["sound_id"] == sound["id"]
+    assert areas["Hund"]["behaviour"] == "play"
+    assert areas["Stumm"]["sound_id"] == ""
+
+    assert client.post(f"/b/{name}/build").get_json()["ok"]
+
+
+def test_an_old_book_without_a_preview_shows_its_original(client):
+    """No preview in the file means the editor falls back to the picture."""
+    name = make_book(client, "Ohne Vorschau")
+    upload_picture(client, name)
+    project = client.data_dir / name
+    stored = json.loads((project / "book.json").read_text())
+    del stored["pages"][0]["preview"]
+    (project / "book.json").write_text(json.dumps(stored), encoding="utf-8")
+
+    book = client.get(f"/b/{name}/data").get_json()
+    assert book["pages"][0]["preview"] == ""
+    assert book["pages"][0]["image"]
+    assert client.get(f"/b/{name}").status_code == 200
+
+
+def test_the_editor_lists_every_area_of_the_page(client):
+    """The list is drawn in the browser, so check its plumbing is all there."""
+    name = make_book(client)
+    page = client.get(f"/b/{name}").data.decode()
+    assert 'id="area-list"' in page
+    assert 'id="area-count"' in page
+    assert 'id="toast"' in page
+
+    strings = json.loads(re.search(
+        r'<script id="book-strings" type="application/json">(.*?)</script>', page, re.S
+    ).group(1))
+    for needed in ("too small", "Sound …", "Delete area", "“{name}” deleted.", "Undo",
+                   "No areas yet — drag one onto the picture."):
+        assert needed in strings, needed
+    # deleting an area is undoable, so it no longer asks first
+    assert "Delete this area?" not in strings
+
+
+def test_the_dots_are_printed_at_the_pitch_the_pen_expects(client):
+    """The one measurement that decides whether a printed page works at all.
+
+    One cell of the OID grid is 1/25 inch — 2.88 pt, 1.016 mm — and tttool's
+    own PDF output tiles at exactly that. A page that tiles at 1.000 mm looks
+    perfect, measures 50 mm on the ruler, and no pen can read it.
+    """
+    name = make_book(client)
+    put_areas(client, name, [{"id": "a1", "name": "Hund", "x": 20, "y": 20, "w": 40, "h": 30}])
+    add_sound(client, name, "a1")
+    result = client.post(f"/b/{name}/build").get_json()
+    assert result["ok"], result
+
+    from pypdf import PdfReader
+
+    for relpath in (result["pages"][0], result["test_pdf"]):
+        page = PdfReader(str(client.data_dir / name / relpath)).pages[0]
+        patterns = page["/Resources"]["/Pattern"]
+        assert patterns, relpath
+        for _, ref in patterns.items():
+            tile = ref.get_object()
+            matrix = [float(v) for v in (tile.get("/Matrix") or [1, 0, 0, 1, 0, 0])]
+            step = float(tile.get("/XStep")) * abs(matrix[0])
+            assert abs(step - 2.88) < 0.005, f"{relpath}: {step} pt per cell, expected 2.88"
+
+
+def test_the_page_scale_does_not_depend_on_our_constant(client):
+    """The unit scale is read from tttool's pattern, not assumed."""
+    from tttool_web.bookbuild import OID_CELL_MM, UNITS_PER_MM, _read_patterns
+
+    # 48 units per 1/25 inch cell — a millimetre is 47.24 units, not 48.
+    assert abs(UNITS_PER_MM - 1200 / 25.4) < 0.001
+    assert abs(OID_CELL_MM - 1.016) < 0.0001
+
+    name = make_book(client)
+    put_areas(client, name, [{"id": "a1", "name": "Hund", "x": 20, "y": 20, "w": 40, "h": 30}])
+    add_sound(client, name, "a1")
+    client.post(f"/b/{name}/build")
+
+    patterns, units = _read_patterns(client.data_dir / name / "druck" / "codes")
+    assert patterns
+    assert abs(units - UNITS_PER_MM) < 0.001

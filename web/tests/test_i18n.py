@@ -33,20 +33,28 @@ from tttool_web.i18n import (  # noqa: E402
 UNTRANSLATED = {"PNG", "PDF", "SVG", "SVG+PNG"}
 
 #: ``t("…")`` in a template, honouring backslash escapes inside the quotes.
-TEMPLATE_CALL = re.compile(r"""t\(\s*(['"])((?:\\.|(?!\1).)*)\1""", re.S)
+TEMPLATE_CALL = re.compile(r"""\bt\(\s*(['"])((?:\\.|(?!\1).)*)\1""", re.S)
+
+#: ``plural("one …", "many …", count)`` in a template — both wordings.
+TEMPLATE_PLURAL = re.compile(
+    r"""plural\(\s*(['"])((?:\\.|(?!\1).)*)\1\s*,\s*(['"])((?:\\.|(?!\3).)*)\3""", re.S
+)
+
+
+#: How many leading arguments of each translating call are source strings.
+TRANSLATORS = {"t": 1, "plural": 2}
 
 
 def python_strings(path: Path) -> list[str]:
-    """Every literal handed to ``t()`` — via ast, so "a" "b" is one string."""
+    """Every literal handed to ``t()``/``plural()`` — via ast, so "a" "b" is one."""
     found = []
     for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
         if not isinstance(node, ast.Call):
             continue
         name = node.func.id if isinstance(node.func, ast.Name) else getattr(node.func, "attr", "")
-        if name == "t" and node.args:
-            first = node.args[0]
-            if isinstance(first, ast.Constant) and isinstance(first.value, str):
-                found.append(first.value)
+        for argument in node.args[: TRANSLATORS.get(name, 0)]:
+            if isinstance(argument, ast.Constant) and isinstance(argument.value, str):
+                found.append(argument.value)
     return found
 
 
@@ -64,10 +72,10 @@ def all_source_strings() -> set[str]:
         found += python_strings(path)
     for template in sorted((PACKAGE / "templates").glob("*.html")):
         text = template.read_text(encoding="utf-8")
-        found += [
-            match.group(2).replace("\\'", "'").replace('\\"', '"')
-            for match in TEMPLATE_CALL.finditer(text)
-        ]
+        unescape = lambda raw: raw.replace("\\'", "'").replace('\\"', '"')  # noqa: E731
+        found += [unescape(match.group(2)) for match in TEMPLATE_CALL.finditer(text)]
+        for match in TEMPLATE_PLURAL.finditer(text):
+            found += [unescape(match.group(2)), unescape(match.group(4))]
 
     # Strings the browser needs are translated on the server and handed over
     # as JSON, so they never appear in a t() call of their own.

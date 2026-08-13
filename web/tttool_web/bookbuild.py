@@ -25,12 +25,32 @@ from xml.sax.saxutils import escape
 from .book import Book, Page
 from .config import config
 from .i18n import t
+from .pictures import picture_pixels, print_copy
 from .projects import Project
 from .runner import run
 
-#: tttool draws its patterns on a grid of 48 units per millimetre. The page has
-#: to use the same unit or the dots come out at the wrong size.
-UNITS_PER_MM = 48
+#: One cell of the OID grid is 1/25 inch across — four dots at 1/100 inch —
+#: and tttool draws that cell as a 48 unit tile. One SVG unit is therefore
+#: 1/1200 inch, and a millimetre is 47.24 units.
+#:
+#: Not 48. tttool's SVG header says width="30mm" for a 1440 unit code, but
+#: 1440 units are 30.48 mm; the header is rounded. Taking it at face value
+#: prints the dot grid 1.6 % too tight — a page that looks perfect, measures
+#: 50 mm on the ruler, and that no pen can read. Its own PDF output tiles at
+#: 2.88 pt = 1.016 mm, which is what this has to reproduce.
+OID_CELL_MM = 25.4 / 25          # one cell of the dot grid, 1.016 mm
+PATTERN_CELL_UNITS = 48          # how tttool draws that cell
+UNITS_PER_MM = PATTERN_CELL_UNITS / OID_CELL_MM
+
+#: Quality of the page picture inside the PDF. The dots are vector and
+#: unaffected; this is only the artwork a human looks at.
+PRINT_JPEG_QUALITY = 85
+
+#: No consumer printer prints to the edge of the sheet — four to five
+#: millimetres all round is normal, more at the bottom on some. Anything this
+#: program puts on the page stays inside this margin, so that it is not the
+#: printer that decides whether the ruler mark or the power-on field exists.
+SAFE_MARGIN_MM = 12.0
 
 PRINT_DIR = "druck"
 YAML_FILE = "book.yaml"
@@ -44,6 +64,9 @@ class BuildResult:
     gme: str = ""
     pdf: str = ""
     test_pdf: str = ""
+    #: The same codes drawn by tttool itself — the control for "is it me or
+    #: the printer?" when a page is not read.
+    control_pdf: str = ""
     pages: list[str] = None
     codes: list[tuple[str, str, int]] = None  # (page, area, code)
     problems: list[str] = None
@@ -56,6 +79,7 @@ class BuildResult:
             "gme": self.gme,
             "pdf": self.pdf,
             "test_pdf": self.test_pdf,
+            "control_pdf": self.control_pdf,
             "pages": self.pages or [],
             "codes": [{"page": p, "area": a, "code": c} for p, a, c in (self.codes or [])],
             "problems": self.problems or [],
@@ -101,18 +125,27 @@ def _yaml_string(value: str) -> str:
 # ------------------------------------------------------------ the patterns
 
 
-def _read_patterns(directory: Path) -> dict[str, str]:
-    """{script name: <pattern> element} from the files tttool just wrote."""
+def _read_patterns(directory: Path) -> tuple[dict[str, str], float]:
+    """{script name: <pattern> element}, and how many units one cell is.
+
+    The cell size comes from the file rather than from our constant, so that a
+    future tttool drawing its tiles differently changes the scale of the page
+    with it instead of printing an unreadable one.
+    """
     patterns: dict[str, str] = {}
+    cell = float(PATTERN_CELL_UNITS)
     for path in directory.glob("oid-*.svg"):
         match = re.search(r"<pattern.*?</pattern>", path.read_text(encoding="utf-8"), re.S)
         if not match:
             continue
+        width = re.search(r'<pattern[^>]*\swidth="([0-9.]+)"', match.group(0))
+        if width:
+            cell = float(width.group(1))
         # oid-<product>-<name>.svg
         name = path.stem.split("-", 2)[-1]
         # tttool's own ids may start with a digit, which no XML name may do.
         patterns[name] = re.sub(r'id="[^"]*"', f'id="oid-{name}"', match.group(0), count=1)
-    return patterns
+    return patterns, cell / OID_CELL_MM
 
 
 def _codes_from_yaml(project: Project, book: Book) -> dict[str, int]:
@@ -149,10 +182,17 @@ def _shape(area, fill: str, u: int, extra: str = "") -> str:
     )
 
 
-def compose_page_svg(project: Project, book: Book, page: Page, patterns: dict[str, str]) -> str:
-    """One printable page: picture, painted areas, power-on field."""
+def compose_page_svg(
+    project: Project, book: Book, page: Page, patterns: dict[str, str],
+    units_per_mm: float = UNITS_PER_MM,
+) -> tuple[str, tuple[int, int] | None]:
+    """One printable page: picture, painted areas, power-on field.
+
+    Returns the SVG and the pixel size of the picture embedded in it, which
+    is what lets the PDF step find that one image again.
+    """
     page_w, page_h = book.page_size
-    u = UNITS_PER_MM
+    u = units_per_mm
 
     used = {
         book.script_name(page, area): area
@@ -164,11 +204,16 @@ def compose_page_svg(project: Project, book: Book, page: Page, patterns: dict[st
         defs += patterns["START"]
 
     body: list[str] = []
+    picture_size = None
     if page.image:
-        image_path = project.path / page.image
+        # Not the original: a print sized copy of it. A 300 dpi scan embedded
+        # as it was uploaded makes a PDF ten times larger than it needs to be,
+        # and the printer cannot tell the difference.
+        image_path = print_copy(project, page.image, page_w, page_h)
         if image_path.is_file():
             mime = mimetypes.guess_type(image_path.name)[0] or "image/png"
             data = base64.b64encode(image_path.read_bytes()).decode()
+            picture_size = picture_pixels(image_path)
             body.append(
                 f'<image x="0" y="0" width="{page_w * u}" height="{page_h * u}" '
                 f'preserveAspectRatio="xMidYMid meet" '
@@ -197,22 +242,37 @@ def compose_page_svg(project: Project, book: Book, page: Page, patterns: dict[st
     # A printed ruler mark: if this is not exactly 50 mm, the print was scaled.
     body.append(_ruler_svg(page_w, page_h, u))
 
-    return _svg_document(page_w, page_h, u, defs, body)
+    return _svg_document(page_w, page_h, u, defs, body), picture_size
 
 
 #: Sizes offered on the test page, in millimetres.
 TEST_SIZES = (8, 10, 12, 15, 20, 30)
 
 
-def compose_test_svg(book: Book, patterns: dict[str, str], sample: str) -> str:
-    """A page to print before the book: does this printer produce readable dots?
+def compose_test_svg(
+    book: Book, patterns: dict[str, str], sample: str,
+    units_per_mm: float = UNITS_PER_MM,
+) -> str:
+    """A page to print before the book. Each thing on it tests one thing.
 
-    The same code is drawn at several sizes, so the user finds out what their
-    printer manages — and the ruler mark tells them whether the print was
-    scaled, which is the mistake that silently ruins everything else.
+    The frame tests how far the printer reaches, the ruler mark tests the
+    scale, and the squares test how small an area may be.
+
+    The squares do *not* test the printer. Every one of them carries the same
+    code at the same dot size and spacing — a bigger square is simply more
+    repetitions of the same tile, since the pattern is tiled rather than
+    stretched. What changes with the size is how much patterned paper
+    surrounds the point the pen is put down on: the pen reads a small window
+    around its tip, and near the edge of a small square part of that window is
+    blank. So the ladder answers "how small can I draw an area and still hit
+    it reliably", not "can my printer do this".
+
+    Whether the printer can do it at all is the largest square: if that one
+    stays silent, no size will help and the problem is the printer or the
+    scale. The page says so.
     """
     page_w, page_h = book.page_size
-    u = UNITS_PER_MM
+    u = units_per_mm
     defs = "".join(patterns[name] for name in {sample, "START"} if name in patterns)
 
     def text(x, y, size, content, weight="normal"):
@@ -221,16 +281,27 @@ def compose_test_svg(book: Book, patterns: dict[str, str], sample: str) -> str:
             f'font-size="{size * u}" font-weight="{weight}" fill="black">{escape(content)}</text>'
         )
 
+    m = SAFE_MARGIN_MM
     body = [
+        # A frame at the margin everything else keeps to. If a printer cuts
+        # this off, it would have cut off the power-on field too — which is
+        # worth knowing from one sheet rather than from a finished book.
+        f'<rect x="{m * u:.1f}" y="{m * u:.1f}" '
+        f'width="{(page_w - 2 * m) * u:.1f}" height="{(page_h - 2 * m) * u:.1f}" '
+        f'fill="none" stroke="black" stroke-width="{0.3 * u}" '
+        f'stroke-dasharray="{3 * u} {2 * u}"/>',
         text(15, 20, 6, t("Print test"), "bold"),
         text(15, 27, 3.4, t("1. Print this page at 100% — never “fit to page”.")),
-        text(15, 32, 3.4, t("2. Check the 50 mm line below with a ruler.")),
-        text(15, 37, 3.4, t("3. Switch the pen on with the field on the left.")),
-        text(15, 42, 3.4, t("4. Tap the squares. The smallest one that answers is your minimum size.")),
+        text(15, 32, 3.4, t("2. The dashed frame has to be complete on all four sides.")),
+        text(15, 37, 3.4, t("3. Check the 50 mm line below with a ruler.")),
+        text(15, 42, 3.4, t("4. Switch the pen on with the field on the left.")),
+        text(15, 47, 3.4, t("5. Tap the squares, biggest first. All carry the same code.")),
+        text(15, 52, 3.4, t("   The smallest one that still answers reliably is the smallest area to use.")),
+        text(15, 57, 3.4, t("   If even the biggest stays silent, it is not the size — printer or scale.")),
     ]
 
     # The power-on field, so the pen can be switched on from this page alone.
-    px, py = 15.0, 52.0
+    px, py = 15.0, 68.0
     if "START" in patterns:
         body.append(
             f'<rect x="{px * u}" y="{py * u}" width="{20 * u}" height="{20 * u}" fill="white"/>'
@@ -261,15 +332,22 @@ def compose_test_svg(book: Book, patterns: dict[str, str], sample: str) -> str:
 
 
 def _ruler_svg(page_w: float, page_h: float, u: int) -> str:
-    """A 50 mm line: if it does not measure 50 mm, the print was scaled."""
-    y = page_h - 4
+    """A 50 mm line: if it does not measure 50 mm, the print was scaled.
+
+    Kept a safe distance from the edge. At four millimetres it was inside the
+    margin most printers cannot reach, so the one mark that proves the scale
+    was the first thing to be cut off.
+    """
+    y = page_h - SAFE_MARGIN_MM
+    right = page_w - SAFE_MARGIN_MM
+    left = right - 50
     return (
         f'<g stroke="black" stroke-width="{0.25 * u}">'
-        f'<line x1="{(page_w - 58) * u}" y1="{y * u}" x2="{(page_w - 8) * u}" y2="{y * u}"/>'
-        f'<line x1="{(page_w - 58) * u}" y1="{(y - 1.5) * u}" x2="{(page_w - 58) * u}" y2="{(y + 1.5) * u}"/>'
-        f'<line x1="{(page_w - 8) * u}" y1="{(y - 1.5) * u}" x2="{(page_w - 8) * u}" y2="{(y + 1.5) * u}"/>'
+        f'<line x1="{left * u}" y1="{y * u}" x2="{right * u}" y2="{y * u}"/>'
+        f'<line x1="{left * u}" y1="{(y - 1.5) * u}" x2="{left * u}" y2="{(y + 1.5) * u}"/>'
+        f'<line x1="{right * u}" y1="{(y - 1.5) * u}" x2="{right * u}" y2="{(y + 1.5) * u}"/>'
         f"</g>"
-        f'<text x="{(page_w - 58) * u}" y="{(y - 2.5) * u}" font-family="{FONT}" '
+        f'<text x="{left * u}" y="{(y - 2.5) * u}" font-family="{FONT}" '
         f'font-size="{2.8 * u}" fill="black">{escape(t("50 mm — check with a ruler"))}</text>'
     )
 
@@ -291,6 +369,37 @@ def _svg_to_pdf(svg_path: Path, pdf_path: Path) -> None:
     import cairosvg  # imported here so the rest of the app runs without it
 
     cairosvg.svg2pdf(url=str(svg_path), write_to=str(pdf_path))
+
+
+def _recompress_picture(pdf_path: Path, size: tuple[int, int]) -> None:
+    """Store the page picture in the PDF as JPEG instead of raw pixels.
+
+    Cairo writes every image losslessly, so a 300 dpi page picture arrives in
+    the PDF as some eighteen megabytes of deflated bitmap. Re-encoding just
+    that one image gives back a file of a couple of megabytes at the same
+    resolution.
+
+    Only the image with exactly the dimensions we embedded is touched. The dot
+    patterns are tiling *patterns*, not images, and are never rewritten — but
+    naming the picture by its size means that stays true even if a future
+    version of cairo decides to rasterise something.
+    """
+    from pypdf import PdfWriter
+
+    try:
+        writer = PdfWriter(clone_from=str(pdf_path))
+        touched = False
+        for page in writer.pages:
+            for image in page.images:
+                if image.image is not None and image.image.size == size:
+                    image.replace(image.image, quality=PRINT_JPEG_QUALITY)
+                    touched = True
+        if not touched:
+            return
+        with pdf_path.open("wb") as handle:
+            writer.write(handle)
+    except Exception:  # noqa: BLE001 - an optimisation, never a reason to fail
+        return
 
 
 def _merge_pdfs(parts: list[Path], target: Path) -> None:
@@ -328,6 +437,10 @@ def build(project: Project, book: Book) -> BuildResult:
     codes_dir = print_dir / "codes"
     shutil.rmtree(codes_dir, ignore_errors=True)
     codes_dir.mkdir(parents=True, exist_ok=True)
+    # A book that lost a page would otherwise keep offering the old seite-4.pdf
+    # for download, and the directory would grow for the life of the book.
+    for stale in print_dir.glob("seite-*.*"):
+        stale.unlink(missing_ok=True)
 
     drawn = run(
         [config.TTTOOL_BIN, "--image-format", "svg", "oid-codes", f"../../{YAML_FILE}"],
@@ -342,14 +455,14 @@ def build(project: Project, book: Book) -> BuildResult:
             log="\n".join(log),
         )
 
-    patterns = _read_patterns(codes_dir)
+    patterns, units_per_mm = _read_patterns(codes_dir)
     code_numbers = _codes_from_yaml(project, book)
 
     page_files: list[str] = []
     pdf_parts: list[Path] = []
     codes: list[tuple[str, str, int]] = []
     for index, page in enumerate(book.pages, start=1):
-        svg = compose_page_svg(project, book, page, patterns)
+        svg, picture_size = compose_page_svg(project, book, page, patterns, units_per_mm)
         svg_path = print_dir / f"seite-{index}.svg"
         svg_path.write_text(svg, encoding="utf-8")
         pdf_path = print_dir / f"seite-{index}.pdf"
@@ -362,6 +475,8 @@ def build(project: Project, book: Book) -> BuildResult:
                 hints=hints,
                 log="\n".join(log),
             )
+        if picture_size:
+            _recompress_picture(pdf_path, picture_size)
         pdf_parts.append(pdf_path)
         page_files.append(project.relpath_of(pdf_path))
         for area in page.areas:
@@ -379,7 +494,9 @@ def build(project: Project, book: Book) -> BuildResult:
     )
     if sample:
         test_svg = print_dir / "druckprobe.svg"
-        test_svg.write_text(compose_test_svg(book, patterns, sample), encoding="utf-8")
+        test_svg.write_text(
+            compose_test_svg(book, patterns, sample, units_per_mm), encoding="utf-8"
+        )
         try:
             _svg_to_pdf(test_svg, print_dir / "druckprobe.pdf")
             test_pdf = project.relpath_of(print_dir / "druckprobe.pdf")
@@ -391,12 +508,38 @@ def build(project: Project, book: Book) -> BuildResult:
         gme=GME_FILE,
         pdf=project.relpath_of(book_pdf),
         test_pdf=test_pdf,
+        control_pdf=_control_sheet(project, print_dir),
         pages=page_files,
         codes=codes,
         problems=[],
         hints=hints + book.dark_area_hints(project),
         log="\n".join(log),
     )
+
+
+def _control_sheet(project: Project, print_dir: Path) -> str:
+    """The same codes, drawn by tttool itself rather than by us.
+
+    When a printed page is not read by the pen there are two possibilities and
+    no way to tell them apart from a single sheet: this program produced
+    something wrong, or the printer cannot render dots this small. tttool's own
+    `oid-table` output is the control. If that sheet is not read either, no
+    change here will help — it is the printer or the paper.
+    """
+    target = print_dir / "vergleich-tttool.pdf"
+    result = run(
+        [
+            config.TTTOOL_BIN,
+            "--image-format", "pdf",
+            "--dpi", "1200",
+            "--pixel-size", "2",
+            "--code-dim", "30",
+            "oid-table", YAML_FILE,
+            f"{PRINT_DIR}/{target.name}",
+        ],
+        project.path,
+    )
+    return project.relpath_of(target) if result["ok"] and target.is_file() else ""
 
 
 def _slug(title: str) -> str:

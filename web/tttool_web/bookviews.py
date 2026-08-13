@@ -13,8 +13,9 @@ from flask import flash, jsonify, redirect, render_template, request, send_file,
 from .audio import VOICES, speak, speech_engine, store_sound
 from .book import GROUP_KINDS, PAPER_SIZES, Book, store_upload
 from .bookbuild import build, converters_available
+from .pictures import forget as forget_derived, make_preview
 from .starters import STARTERS, apply_starter
-from .i18n import t
+from .i18n import plural, t
 from .projects import (
     Project,
     ProjectError,
@@ -22,20 +23,28 @@ from .projects import (
     sanitize_filename,
     unique_name,
 )
-from .transfer import export_book, export_name, import_book
+from .transfer import (
+    backup_name,
+    export_all,
+    export_book,
+    export_name,
+    import_backup,
+    import_book,
+    looks_like_backup,
+)
 
 #: Strings the editor needs in the browser.
 JS_STRINGS = [
     "Saved",
     "Saving …",
     "Could not save — is the server still running?",
-    "Delete this area?",
     "Building …",
     "Area",
     "No sound yet — the area stays silent.",
     "Print this",
     "Copy this onto the pen",
     "Print test page first",
+    "Comparison sheet from tttool",
     "Delete this page with everything on it?",
     "Click the corners; click the first one again to close the shape.",
     "Done",
@@ -63,6 +72,12 @@ JS_STRINGS = [
     "Area {name}, {x} by {y} millimetres, {sound}",
     "plays {sound}",
     "no sound yet",
+    "No areas yet — drag one onto the picture.",
+    "too small",
+    "Sound …",
+    "Delete area",
+    "“{name}” deleted.",
+    "Undo",
 ]
 
 
@@ -126,12 +141,47 @@ def register_book_routes(app, route, get_project):
 
     @route("/books/import", methods=["POST"])
     def import_book_file():
+        """One book or a whole backup — the file says which."""
         upload = request.files.get("book")
         if not upload or not upload.filename:
             raise ProjectError(t("Please choose an exported book."))
+        if looks_like_backup(upload):
+            restored = import_backup(upload)
+            flash(
+                plural(
+                    "Added one book from the backup.",
+                    "Added {count} books from the backup.",
+                    len(restored),
+                ),
+                "success",
+            )
+            return redirect(url_for("index"))
         project = import_book(upload, (request.form.get("title") or "").strip()[:80])
         flash(t("Imported “{title}”.", title=Book.load(project).title), "success")
         return redirect(url_for("edit_book", name=project.name))
+
+    @route("/books/backup")
+    def backup_everything():
+        """Every book on this server, in one file."""
+        books = []
+        for entry in list_projects():
+            try:
+                project = Project(entry["name"]).require()
+            except ProjectError:
+                continue
+            if Book.is_book(project):
+                books.append((project, Book.load(project)))
+        if not books:
+            raise ProjectError(t("There are no books to back up yet."))
+        buffer = tempfile.SpooledTemporaryFile(max_size=64 * 1024 * 1024)
+        export_all(books, buffer)
+        buffer.seek(0)
+        return send_file(
+            buffer,
+            mimetype="application/zip",
+            as_attachment=True,
+            download_name=backup_name(),
+        )
 
     # -- the editor -------------------------------------------------------
 
@@ -166,6 +216,7 @@ def register_book_routes(app, route, get_project):
             if known is None:
                 continue
             page.image = known.image
+            page.preview = known.preview
         updated.save(project)
         problems, hints = updated.check()
         return jsonify({"ok": True, "problems": problems, "hints": hints})
@@ -179,10 +230,14 @@ def register_book_routes(app, route, get_project):
         upload = request.files.get("image")
         if not upload or not upload.filename:
             raise ProjectError(t("Please choose a picture."))
+        forget_derived(project, page.image)
         page.image, _ = store_upload(project, "seiten", page.id, upload)
+        # The editor gets a small copy; the original is kept for printing.
+        page.preview = make_preview(project, page.image)
         book.save(project)
-        return jsonify({"ok": True, "image": page.image,
-                        "url": url_for("raw", name=project.name, path=page.image)})
+        return jsonify({"ok": True, "image": page.image, "preview": page.preview,
+                        "url": url_for("raw", name=project.name,
+                                       path=page.preview or page.image)})
 
     # -- the sound library ------------------------------------------------
 
@@ -343,6 +398,11 @@ def register_book_routes(app, route, get_project):
         payload["test_pdf_url"] = (
             url_for("download", name=project.name, path=result.test_pdf) if result.test_pdf else ""
         )
+        payload["control_pdf_url"] = (
+            url_for("download", name=project.name, path=result.control_pdf)
+            if result.control_pdf
+            else ""
+        )
         return jsonify(payload)
 
     # -- pages ------------------------------------------------------------
@@ -364,7 +424,16 @@ def register_book_routes(app, route, get_project):
     @route("/b/<name>/pages/<page_id>/delete", methods=["POST"])
     def delete_page(name, page_id):
         project, book = get_book_project(name)
+        page = book.page(page_id)
         book.remove_page(page_id)
+        # The picture of a deleted page is of no use to anyone, and would sit
+        # in the project (and in every export) for the rest of its life — but a
+        # duplicated page shares the file with its original, so only the last
+        # page using it may throw it away.
+        still_used = any(other.image == page.image for other in book.pages)
+        if page.image and not still_used:
+            forget_derived(project, page.image)
+            (project.path / page.image).unlink(missing_ok=True)
         book.save(project)
         return jsonify({"ok": True, "book": book.to_dict(), "page": book.pages[0].id})
 

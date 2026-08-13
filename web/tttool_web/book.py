@@ -34,7 +34,13 @@ DEFAULT_PAPER = "a4-landscape"
 MIN_AREA_MM = 10.0
 #: Size and margin of the power-on field that every page carries.
 POWER_FIELD_MM = 20.0
-POWER_FIELD_MARGIN_MM = 8.0
+#: How close to the edge an area may come before the printer is likely to cut
+#: it. Most printers manage 4-5 mm; this is that with room to spare.
+EDGE_MARGIN_MM = 10.0
+#: Distance of the power-on field from the edges. Printers cannot reach the
+#: last few millimetres of a sheet, and a half printed power-on field is a
+#: book that never switches on.
+POWER_FIELD_MARGIN_MM = 12.0
 
 #: What an area can do. The interface offers exactly these.
 BEHAVIOURS = ("play", "random", "sequence", "answer", "collect", "advanced")
@@ -157,7 +163,11 @@ class Page:
     id: str
     name: str = ""
     #: Path of the page picture inside the project, empty while none is set.
+    #: This is always the original: it is what gets printed.
     image: str = ""
+    #: A smaller copy for the editor. Derived from ``image``, so it may be
+    #: regenerated or missing, in which case the editor shows the original.
+    preview: str = ""
     areas: list[Area] = field(default_factory=list)
 
     def area(self, area_id: str) -> Area:
@@ -354,7 +364,8 @@ class Book:
 
     def duplicate_page(self, page: Page) -> Page:
         copy = Page(id=_next_id("s", {p.id for p in self.pages}),
-                    name=f"{page.name or page.id} (2)", image=page.image)
+                    name=f"{page.name or page.id} (2)", image=page.image,
+                    preview=page.preview)
         taken = {a.id for p in self.pages for a in p.areas}
         for area in page.areas:
             # The sound comes along: one sound of the library can play in as
@@ -406,6 +417,7 @@ class Book:
                 id=str(raw_page.get("id") or ""),
                 name=str(raw_page.get("name") or "")[:80],
                 image=str(raw_page.get("image") or ""),
+                preview=str(raw_page.get("preview") or ""),
             )
             if not ID_RE.match(page.id):
                 page.id = _next_id("s", {p.id for p in book.pages})
@@ -474,9 +486,12 @@ class Book:
                 path, name = legacy[area.id]
                 existing = next((s for s in book.sounds if s.file == path), None)
                 if existing is None:
+                    # The old field held the uploaded file name; the library
+                    # shows names, so "wau.mp3" becomes "wau".
+                    label = Path(name).stem if name else Path(path).stem
                     existing = Sound(
                         id=_next_id("t", {s.id for s in book.sounds}),
-                        name=name or Path(path).stem,
+                        name=label,
                         file=path,
                     )
                     book.sounds.append(existing)
@@ -599,6 +614,7 @@ class Book:
         hints: list[str] = []
         px, py, pw, ph = self.power_field
         power = Area(id="power", x=px, y=py, w=pw, h=ph)
+        page_w, page_h = self.page_size
 
         for page in self.pages:
             label = page.name or page.id
@@ -626,6 +642,17 @@ class Book:
                     hints.append(
                         t("“{name}” on “{label}” lies on the power-on field and will not work there.",
                           name=name, label=label)
+                    )
+                if (
+                    area.x < EDGE_MARGIN_MM
+                    or area.y < EDGE_MARGIN_MM
+                    or area.x + area.w > page_w - EDGE_MARGIN_MM
+                    or area.y + area.h > page_h - EDGE_MARGIN_MM
+                ):
+                    hints.append(
+                        t("“{name}” on “{label}” reaches into the {size} mm at the edge that "
+                          "many printers cannot print — that part will be missing.",
+                          name=name, label=label, size=f"{EDGE_MARGIN_MM:.0f}")
                     )
             for i, area in enumerate(page.areas):
                 for other in page.areas[i + 1 :]:

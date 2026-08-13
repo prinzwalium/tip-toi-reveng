@@ -206,6 +206,23 @@ jobs:
           assert abs(w - 297) < 1 and abs(h - 210) < 1, "wrong page size"
           PY
           docker exec tttool-web tttool info /data/ci-buch/buch.gme | grep -i 'product id'
+
+          # The measurement that decides whether a printed page works at all:
+          # one cell of the dot grid must be 1/25 inch = 2.88 pt. Checked
+          # against the real tttool, whose own PDF output tiles at exactly
+          # that — a page tiled at 1.000 mm looks perfect and is unreadable.
+          docker exec -i tttool-web python3 - <<'PY'
+          from pypdf import PdfReader
+          page = PdfReader("/data/ci-buch/druck/ci-buch.pdf").pages[0]
+          patterns = page["/Resources"]["/Pattern"]
+          assert patterns, "no dot patterns in the printed page"
+          for name, ref in patterns.items():
+              tile = ref.get_object()
+              matrix = [float(v) for v in (tile.get("/Matrix") or [1, 0, 0, 1, 0, 0])]
+              step = float(tile.get("/XStep")) * abs(matrix[0])
+              print(f"{name}: {step:.5f} pt per cell = {step / 72 * 25.4:.5f} mm")
+              assert abs(step - 2.88) < 0.005, f"{name} tiles at {step} pt, expected 2.88"
+          PY
           echo "::endgroup::"
 
           # Passing a book on has to survive the round trip through a file:
@@ -226,10 +243,24 @@ jobs:
           test "$original" = "$imported" || { echo "codes changed: $original != $imported"; exit 1; }
           echo "::endgroup::"
 
+          # And the same for the whole server: back everything up, put it back.
+          curl -fsS -o sicherung.tiptoi http://127.0.0.1:8080/books/backup
+          python3 -c "import zipfile,sys; z=zipfile.ZipFile('sicherung.tiptoi'); n=z.namelist(); \
+            print(n); sys.exit(0 if 'tiptoi-sicherung.json' in n else 1)"
+          curl -fsS -o /dev/null -X POST http://127.0.0.1:8080/books/import \
+            -F 'book=@sicherung.tiptoi;filename=sicherung.tiptoi'
+          restored=$(curl -fsS -X POST http://127.0.0.1:8080/b/ci-buch-3/build)
+          echo "$restored" | grep -q '"ok":true'
+          echo "::endgroup::"
+
           # The interface is German by default and switches on request.
           echo "::group::language"
-          curl -fsS http://127.0.0.1:8080/ | grep -q 'Deine Tiptoi-Bücher'
-          curl -fsS --cookie 'tttool_lang=en' http://127.0.0.1:8080/ | grep -q 'Your Tiptoi books'
+          # To a file, not into "grep -q": grep exits at the first match, curl
+          # is left writing into a closed pipe and fails with 23.
+          curl -fsS -o start-de.html http://127.0.0.1:8080/
+          grep -q 'Deine Tiptoi-Bücher' start-de.html
+          curl -fsS -o start-en.html --cookie 'tttool_lang=en' http://127.0.0.1:8080/
+          grep -q 'Your Tiptoi books' start-en.html
           echo "::endgroup::"
 
       - name: Log in to ghcr.io

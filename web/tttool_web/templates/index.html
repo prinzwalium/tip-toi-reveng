@@ -98,11 +98,16 @@
 
   <form method="post" action="{{ url_for('import_book_file') }}" enctype="multipart/form-data"
         class="row import-row">
-    <span class="muted hint">{{ t("Got a book from someone else?") }}</span>
+    <span class="muted hint">{{ t("Got a book from someone else, or a backup?") }}</span>
     <input type="file" name="book" accept=".tiptoi,.zip" required
            aria-label="{{ t('Exported book file') }}">
     <button type="submit" class="ghost"
-            data-tip="{{ t('Adds the book to this server. Your own books stay untouched.') }}">{{ t("Add book") }}</button>
+            data-tip="{{ t('Adds the book — or every book of a backup — to this server. Your own books stay untouched.') }}">{{ t("Add book") }}</button>
+    {% if books %}
+      <span class="grow"></span>
+      <a class="button ghost" href="{{ url_for('backup_everything') }}"
+         data-tip="{{ t('Every book on this server in one file. Keep it somewhere safe; “Add book” puts them all back.') }}">{{ t("Back up everything") }}</a>
+    {% endif %}
   </form>
 </section>
 
