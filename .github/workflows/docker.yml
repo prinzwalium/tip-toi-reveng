@@ -255,8 +255,12 @@ jobs:
 
           # The interface is German by default and switches on request.
           echo "::group::language"
-          curl -fsS http://127.0.0.1:8080/ | grep -q 'Deine Tiptoi-Bücher'
-          curl -fsS --cookie 'tttool_lang=en' http://127.0.0.1:8080/ | grep -q 'Your Tiptoi books'
+          # To a file, not into "grep -q": grep exits at the first match, curl
+          # is left writing into a closed pipe and fails with 23.
+          curl -fsS -o start-de.html http://127.0.0.1:8080/
+          grep -q 'Deine Tiptoi-Bücher' start-de.html
+          curl -fsS -o start-en.html --cookie 'tttool_lang=en' http://127.0.0.1:8080/
+          grep -q 'Your Tiptoi books' start-en.html
           echo "::endgroup::"
 
       - name: Log in to ghcr.io
