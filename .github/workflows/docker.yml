@@ -108,8 +108,13 @@ jobs:
           context: .
           load: true
           tags: tttool-web:ci
+          # The haskell:9.2.8 build stage can no longer verify Hackage's
+          # current TUF root signatures ("root.json does not have enough
+          # signatures"), so the GHC build is broken until the base image is
+          # renewed. Until then the release binary builds the same Haskell
+          # code; a manual run can still pick "build".
           build-args: |
-            TTTOOL_SOURCE=${{ inputs.tttool_source || 'build' }}
+            TTTOOL_SOURCE=${{ inputs.tttool_source || (github.ref == 'refs/heads/testing' && 'release') || 'build' }}
             BUILD_REF=${{ github.ref_name }}
             BUILD_SHA=${{ github.sha }}
           cache-from: type=gha
