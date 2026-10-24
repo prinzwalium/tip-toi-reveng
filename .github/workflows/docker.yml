@@ -273,8 +273,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # Keep in step with the Build image step above.
           build-args: |
-            TTTOOL_SOURCE=${{ inputs.tttool_source || 'build' }}
+            TTTOOL_SOURCE=${{ inputs.tttool_source || (github.ref == 'refs/heads/testing' && 'release') || 'build' }}
             BUILD_REF=${{ github.ref_name }}
             BUILD_SHA=${{ github.sha }}
           # Everything is in the cache from the build step above already.
