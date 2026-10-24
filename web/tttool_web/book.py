@@ -86,6 +86,22 @@ class Group:
     reward_sound_id: str = ""
 
 
+def _num(value, default: float) -> float:
+    """A float out of user-supplied JSON, or ``default`` when it is garbage."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _points(raw_points) -> list[list[float]]:
+    return [
+        [_num(p[0], 0.0), _num(p[1], 0.0)]
+        for p in (raw_points or [])[:200]
+        if isinstance(p, (list, tuple)) and len(p) == 2
+    ]
+
+
 @dataclass
 class Area:
     id: str
@@ -306,13 +322,33 @@ class Book:
         return bool(self.script_lines(Page(id="x"), area))
 
     def sound_usage(self) -> dict[str, int]:
-        """How many areas play each sound — shown before deleting one."""
+        """How many places play each sound — shown before deleting one."""
         usage = {sound.id: 0 for sound in self.sounds}
         for page in self.pages:
             for area in page.areas:
                 if area.sound_id in usage:
                     usage[area.sound_id] += 1
+                for sound_id in area.sound_ids:
+                    if sound_id in usage:
+                        usage[sound_id] += 1
+        for group in self.groups:
+            for field_name in ("right_sound_id", "wrong_sound_id", "reward_sound_id"):
+                sound_id = getattr(group, field_name)
+                if sound_id in usage:
+                    usage[sound_id] += 1
         return usage
+
+    def forget_sound(self, sound_id: str) -> None:
+        """Remove every reference to a sound that is about to be deleted."""
+        for page in self.pages:
+            for area in page.areas:
+                if area.sound_id == sound_id:
+                    area.sound_id = ""
+                area.sound_ids = [s for s in area.sound_ids if s != sound_id]
+        for group in self.groups:
+            for field_name in ("right_sound_id", "wrong_sound_id", "reward_sound_id"):
+                if getattr(group, field_name) == sound_id:
+                    setattr(group, field_name, "")
 
     def area(self, area_id: str) -> tuple[Page, Area]:
         for page in self.pages:
@@ -391,9 +427,13 @@ class Book:
         """
         if not isinstance(data, dict):
             raise ProjectError(t("The book file is damaged"))
+        try:
+            product_id = int(_num(data.get("product_id"), 42))
+        except (TypeError, ValueError):
+            product_id = 42
         book = cls(
             title=str(data.get("title") or "Mein Buch")[:80],
-            product_id=int(data.get("product_id") or 42),
+            product_id=product_id,
             paper=data.get("paper") if data.get("paper") in PAPER_SIZES else DEFAULT_PAPER,
         )
         if not 1 <= book.product_id <= 999:
@@ -415,16 +455,12 @@ class Book:
                 area = Area(
                     id=str(raw_area.get("id") or ""),
                     name=str(raw_area.get("name") or "")[:80],
-                    x=float(raw_area.get("x") or 0),
-                    y=float(raw_area.get("y") or 0),
-                    w=float(raw_area.get("w") or 20),
-                    h=float(raw_area.get("h") or 20),
+                    x=_num(raw_area.get("x"), 0),
+                    y=_num(raw_area.get("y"), 0),
+                    w=_num(raw_area.get("w"), 20),
+                    h=_num(raw_area.get("h"), 20),
                     kind="poly" if raw_area.get("kind") == "poly" else "rect",
-                    points=[
-                        [float(p[0]), float(p[1])]
-                        for p in points[:200]
-                        if isinstance(p, (list, tuple)) and len(p) == 2
-                    ],
+                    points=_points(points),
                     sound_id=str(raw_area.get("sound_id") or ""),
                     behaviour=(
                         raw_area.get("behaviour")

@@ -14,6 +14,7 @@ Which image should I run?
 | `ghcr.io/<owner>/tttool-web:latest` | the newest release tag | you just want a working tool |
 | `…:1.2.3`, `…:1.2`, `…:1` | that release | you want to pin a version |
 | `…:beta` | the `beta` branch | you agreed to try the next version and report back |
+| `…:testing` | the `testing` branch | you want the fixes that are on their way to beta |
 | `…:edge` | `master` | you follow development and can live with rough edges |
 | `…:sha-abc1234` | one commit | you need exactly the build someone mentioned |
 
@@ -53,11 +54,13 @@ How the branches work
 ---------------------
 
 ```
-feature branch  ──PR──▶  beta  ──PR──▶  master  ──tag web-v1.2.3──▶  release
-                          ↓               ↓                ↓
-                        :beta           :edge     :1.2.3 :1.2 :1 :latest
+feature branch  ──PR──▶  testing  ──PR──▶  beta  ──PR──▶  master  ──tag web-v1.2.3──▶  release
+                          ↓                  ↓               ↓                ↓
+                       :testing            :beta           :edge     :1.2.3 :1.2 :1 :latest
 ```
 
+* `testing` is where fixes and experiments land first, maintained as a rolling
+  branch; its image is published as `:testing`.
 * `beta` is the integration branch: work that is ready for someone to try, but
   not yet promised to be stable.
 * `master` is what has survived beta.

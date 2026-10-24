@@ -259,10 +259,7 @@ def register_book_routes(app, route, get_project):
         sound = book.sound(sound_id)
         (project.path / sound.file).unlink(missing_ok=True)
         book.sounds = [s for s in book.sounds if s.id != sound_id]
-        for page in book.pages:
-            for area in page.areas:
-                if area.sound_id == sound_id:
-                    area.sound_id = ""
+        book.forget_sound(sound_id)
         book.save(project)
         return jsonify({"ok": True, "book": book.to_dict(), **library(project, book)})
 

@@ -7,6 +7,25 @@ YYYY-MM-DD.
 Unreleased
 ----------
 
+Fixes on the `testing` branch:
+
+* The sound library now counts the sounds used by “one of several” and
+  “one after the other” areas and by the reactions of a quiz or collecting
+  game, so the delete confirmation no longer calls a sound unused that ten
+  areas still play.
+* Deleting a sound also removes it from those lists and from the reactions of
+  the games. Before, the book kept referring to the deleted sound and the next
+  build failed in tttool with “Could not find any of these files”.
+* A book whose `product_id`, coordinates or polygon corners are not numbers is
+  rejected with a proper message instead of crashing the request. This could
+  happen when saving from a stale browser tab or when importing a hand-edited
+  `.tiptoi` file.
+* The editor marks an area as “silent” only when it really has nothing to do:
+  areas with several sounds or a hand-written script were marked wrongly, and
+  the screen reader label said “no sound yet” about areas that play several.
+* New image channel `:testing`: CI builds and publishes the `testing` branch as
+  `ghcr.io/<owner>/tttool-web:testing`.
+
 1.6.0 — sharing and finish
 --------------------------
 

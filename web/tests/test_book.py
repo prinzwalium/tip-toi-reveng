@@ -515,6 +515,81 @@ def test_deleting_a_sound_silences_the_areas_that_used_it(client):
     assert not (client.data_dir / name / "sounds" / f"{sound_id}.ogg").exists()
 
 
+def test_deleting_a_sound_cleans_up_every_reference(client):
+    """A sound can sit in sound_ids and in a game's reactions, not only in
+    sound_id — deleting it must remove all of them, or the next build emits
+    a script tttool refuses to assemble."""
+    name = make_book(client)
+    added = client.post(
+        f"/b/{name}/sounds/add",
+        data={"sound": (io.BytesIO(b"audio"), "wau.mp3")},
+        content_type="multipart/form-data",
+    ).get_json()
+    sound_id = added["sound"]
+    group = client.post(f"/b/{name}/groups", data={"kind": "quiz"}).get_json()["group"]
+    client.post(f"/b/{name}/groups/{group}", data={"right_sound_id": sound_id})
+    put_areas(
+        client,
+        name,
+        [
+            {"id": "a1", "name": "Hund", "x": 10, "y": 10, "w": 40, "h": 30,
+             "behaviour": "random", "sound_ids": [sound_id]},
+        ],
+    )
+
+    # usage counts the sound_ids entries and the game reactions too
+    library = client.get(f"/b/{name}/sounds").get_json()
+    assert library["sounds"][0]["used"] == 2
+
+    result = client.post(f"/b/{name}/sounds/{sound_id}/delete").get_json()
+    assert result["book"]["pages"][0]["areas"][0]["sound_ids"] == []
+    assert result["book"]["groups"][0]["right_sound_id"] == ""
+
+
+def test_saving_garbage_from_the_browser_is_rejected_not_crashed(client):
+    """The browser (or an imported file) may hold anything; from_dict must
+    answer with an error, never with an unhandled exception."""
+    name = make_book(client)
+    for payload in (
+        {"title": "x", "product_id": "abc", "pages": []},
+        {"title": "x", "product_id": None, "pages": [
+            {"id": "s1", "areas": [{"id": "a1", "x": "garbage", "w": [1, 2]}]}]},
+    ):
+        response = client.put(f"/b/{name}/data", json=payload)
+        assert response.status_code == 200, payload
+
+
+def test_an_import_with_garbage_numbers_still_lands_in_a_book(client):
+    """A hand-edited archive must not be able to crash the import either."""
+    import zipfile
+
+    payload = io.BytesIO()
+    with zipfile.ZipFile(payload, "w") as archive:
+        archive.writestr(
+            "tiptoi-buch.json",
+            json.dumps(
+                {
+                    "format": "tttool-web-book",
+                    "version": 1,
+                    "book": {
+                        "title": "B\u00f6se",
+                        "product_id": "not a number",
+                        "pages": [{"id": "s1", "areas": [
+                            {"id": "a1", "x": "garbage", "w": [1, 2], "h": None}
+                        ]}],
+                    },
+                }
+            ),
+        )
+    response = import_archive(client, payload.getvalue())
+    assert response.status_code == 302
+    name = response.headers["Location"].rstrip("/").split("/")[-1]
+    book = client.get(f"/b/{name}/data").get_json()
+    assert book["product_id"] == 42
+    assert book["pages"][0]["areas"][0]["x"] == 0
+    assert book["pages"][0]["areas"][0]["w"] == 20
+
+
 def test_a_sound_can_be_renamed(client):
     name = make_book(client)
     add_sound(client, name, "a1") if False else None

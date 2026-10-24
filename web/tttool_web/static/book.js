@@ -29,6 +29,20 @@
     if (!a || !a.sound_id) return null;
     return (book.sounds || []).filter(function (s) { return s.id === a.sound_id; })[0] || null;
   }
+  function firstSoundOf(a) {
+    // Where an area's sound lives depends on its behaviour.
+    if (a.behaviour === "random" || a.behaviour === "sequence") {
+      var ids = a.sound_ids || [];
+      return ids.length
+        ? (book.sounds || []).filter(function (s) { return s.id === ids[0]; })[0] || null
+        : null;
+    }
+    return soundOf(a);
+  }
+  function doesSomething(a) {
+    if (a.behaviour === "advanced") return (a.script || "").trim().length > 0;
+    return !!firstSoundOf(a);
+  }
   function selected() { return selectedId ? area(selectedId) : null; }
 
   // ------------------------------------------------------------- saving
@@ -86,7 +100,14 @@
   function isPolygon(a) { return a.kind === "poly" && a.points && a.points.length >= 3; }
 
   function describe(a) {
-    var sound = soundOf(a);
+    var sound = firstSoundOf(a);
+    if (a.behaviour === "advanced") {
+      return say("Area {name}, {x} by {y} millimetres, {sound}")
+        .replace("{name}", a.name || say("Area"))
+        .replace("{x}", Math.round(a.x))
+        .replace("{y}", Math.round(a.y))
+        .replace("{sound}", say("plays {sound}").replace("{sound}", a.script || ""));
+    }
     return say("Area {name}, {x} by {y} millimetres, {sound}")
       .replace("{name}", a.name || say("Area"))
       .replace("{x}", Math.round(a.x))
@@ -100,7 +121,7 @@
     areasLayer.textContent = "";
     currentPage.areas.forEach(function (a) {
       var g = svg("g", {
-        class: "area" + (a.id === selectedId ? " selected" : "") + (a.sound_id ? "" : " silent"),
+        class: "area" + (a.id === selectedId ? " selected" : "") + (doesSomething(a) ? "" : " silent"),
         // Reachable and describable without a mouse: Tab walks the areas of
         // the page, and the label says which one and what it does.
         tabindex: "0",
@@ -165,7 +186,7 @@
     ["x", "y", "w", "h"].forEach(function (key) {
       document.getElementById("area-" + key).value = Math.round(a[key] * 10) / 10;
     });
-    var sound = soundOf(a);
+    var sound = firstSoundOf(a);
     document.getElementById("sound-play").classList.toggle("hidden", !sound);
     document.getElementById("sound-clear").classList.toggle("hidden", !sound);
     document.getElementById("sound-name").textContent = sound
@@ -791,7 +812,7 @@
   });
 
   document.getElementById("sound-play").addEventListener("click", function () {
-    var sound = soundOf(selected());
+    var sound = firstSoundOf(selected());
     if (!sound) return;
     var player = document.getElementById("sound-player");
     player.src = url(urls.raw, sound.file);
@@ -949,7 +970,9 @@
     if (!guide || window.localStorage.getItem(GUIDE_KEY) === "1") return;
     var areas = book.pages.reduce(function (total, page) { return total + page.areas.length; }, 0);
     var withSound = book.pages.some(function (page) {
-      return page.areas.some(function (a) { return a.sound_id || (a.sound_ids || []).length; });
+      return page.areas.some(function (a) {
+        return a.sound_id || (a.sound_ids || []).length || (a.behaviour === "advanced" && (a.script || "").trim());
+      });
     });
     var step = !currentPage.image ? "picture" : !areas ? "area" : !withSound ? "sound" : "build";
     guide.classList.remove("hidden");

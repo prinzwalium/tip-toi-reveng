@@ -10,17 +10,19 @@ name: "Docker image"
 # with the same Dockerfile.
 
 on:
-  # Pushes to master and beta and release tags always publish, so that the
-  # published image matches the branch even when only an example file changed.
+  # Pushes to master, beta, testing and release tags always publish, so that
+  # the published image matches the branch even when only an example file
+  # changed.
   #
   #   master        -> :edge      (what is merged, may be rough)
   #   beta          -> :beta      (what you are asked to test)
+  #   testing       -> :testing   (the testing branch, built by its maintainer)
   #   tag web-v*    -> :1.2.3, :1.2, :1, :latest
   #
   # Release tags are prefixed with "web-" so that they never collide with
   # tttool's own version tags in this repository.
   push:
-    branches: [ master, beta ]
+    branches: [ master, beta, testing ]
     tags: [ 'web-v*' ]
   # Pull requests only rebuild when something the image is made of changed.
   pull_request:
@@ -251,6 +253,7 @@ jobs:
           tags: |
             type=raw,value=edge,enable={{is_default_branch}}
             type=raw,value=beta,enable=${{ github.ref == 'refs/heads/beta' }}
+            type=raw,value=testing,enable=${{ github.ref == 'refs/heads/testing' }}
             type=match,pattern=web-v(\d+\.\d+\.\d+),group=1
             type=match,pattern=web-v(\d+\.\d+),group=1
             type=match,pattern=web-v(\d+),group=1
