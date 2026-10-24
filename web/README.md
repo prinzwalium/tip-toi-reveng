@@ -41,7 +41,11 @@ Recording needs the page to be served over `https://` or opened on
 
 Print the PDF **at 100%** (never “fit to page”) on a laser printer, check the
 printed 50 mm mark with a ruler, tap the power-on field, and the pen reads your
-book. What is still missing is on the [roadmap](ROADMAP.md).
+book. The dots go into the PDF as a 1200 dpi raster image — the same dots
+`tttool oid-codes` writes — so the print does not depend on how well the
+printer's driver rasterizes vector patterns. The pen needs a printer resolution
+of **1200 dpi**; a 600 dpi printer cannot resolve the 0.25 mm dot lattice, no
+matter what is in the file. What is still missing is on the [roadmap](ROADMAP.md).
 
 Under the book editor sits a full front end for
 [`tttool`](https://github.com/entropia/tip-toi-reveng), for anyone who wants it:

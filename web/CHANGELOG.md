@@ -25,6 +25,12 @@ Fixes on the `testing` branch:
   the screen reader label said “no sound yet” about areas that play several.
 * New image channel `:testing`: CI builds and publishes the `testing` branch as
   `ghcr.io/<owner>/tttool-web:testing`.
+* The printed page now carries the OID dots as a 1200 dpi raster image (the same
+  dots `tttool oid-codes` writes) instead of vector squares. The geometry was
+  always correct — but whether a print worked also depended on how well the
+  printer's driver rasterized the vector tiling pattern, which varies wildly
+  between viewers and drivers and silently ruined prints. A raster does not:
+  what you print is the pixels tttool made.
 
 1.6.0 — sharing and finish
 --------------------------

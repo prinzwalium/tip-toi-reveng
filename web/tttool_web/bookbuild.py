@@ -7,8 +7,8 @@ The steps are:
 2. ``tttool assemble`` it into ``book.gme``; tttool assigns an OID code to every
    area and remembers it in ``book.codes.yaml``, so codes stay stable and
    already printed pages keep working,
-3. ``tttool oid-codes --image-format svg`` to get each code as a tileable SVG
-   pattern,
+3. ``tttool oid-codes --image-format svg+png`` to get each code as a tileable SVG
+   pattern whose dots are a 1200 dpi raster image,
 4. compose one SVG per page: the picture, each area filled with its pattern,
    and the power-on field,
 5. render those to PDF at their true physical size and bind them into one file.
@@ -330,7 +330,7 @@ def build(project: Project, book: Book) -> BuildResult:
     codes_dir.mkdir(parents=True, exist_ok=True)
 
     drawn = run(
-        [config.TTTOOL_BIN, "--image-format", "svg", "oid-codes", f"../../{YAML_FILE}"],
+        [config.TTTOOL_BIN, "--image-format", "svg+png", "oid-codes", f"../../{YAML_FILE}"],
         codes_dir,
     )
     log.append(drawn["stdout"] + drawn["stderr"])

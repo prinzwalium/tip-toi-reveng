@@ -36,10 +36,34 @@ if command == "assemble":
 elif command == "oid-codes":
     yaml_path = Path(args[1])
     names = re.findall(r"^  (\\w+):", yaml_path.read_text(), re.M) + ["START"]
+    # The real tttool writes --image-format svg+png: a 48x48 1200 dpi PNG of the
+    # dots inside the pattern, so the page does not depend on the printer's
+    # rasterizing vector tiles. The stub draws the same kind of tile.
+    import base64
+    import struct
+    import zlib
+
+    def png48():
+        """A 48x48 grayscale PNG: dots every 12 px, 2 px wide, marked 1200 dpi."""
+        row = bytes(0 if x % 12 in (5, 6) else 255 for x in range(48))
+        raw = b"".join(b"\\x00" + row for _ in range(48))
+        chunks = [
+            b"IHDR" + struct.pack(">IIBBBBB", 48, 48, 8, 0, 0, 0, 0),
+            b"pHYs" + struct.pack(">IIB", 47244, 47244, 1),  # 1200 dpi in dots/m
+            b"IDAT" + zlib.compress(raw),
+            b"IEND",
+        ]
+        out = b"\\x89PNG\\r\\n\\x1a\\n"
+        for chunk in chunks:
+            out += struct.pack(">I", len(chunk) - 4) + chunk
+            out += struct.pack(">I", zlib.crc32(chunk) & 0xFFFFFFFF)
+        return base64.b64encode(out).decode()
+
+    tile = png48()
     for name in names:
         pattern = (
             f'<pattern width="48" height="48" id="{name}" patternUnits="userSpaceOnUse">'
-            '<path d="M 43,43 h 2 v 2 h -2 Z" /></pattern>'
+            f'<image width="48" height="48" xlink:href="data:image/png;base64,{tile}"/></pattern>'
         )
         Path(f"oid-42-{name}.svg").write_text(
             '<?xml version="1.0" encoding="UTF-8"?>'
@@ -311,6 +335,43 @@ def test_page_svg_paints_each_area_with_its_own_pattern(client, built):
     assert 'fill="url(#oid-START)"' in svg
     # the page itself is measured in millimetres
     assert 'width="297mm"' in svg and 'height="210mm"' in svg
+
+
+def test_printed_dots_are_a_1200_dpi_raster(client, built):
+    """The pen reads a 0.25 mm dot lattice. Whether that survives the trip to
+    paper may not depend on how well the printer's driver rasterizes vector
+    tiling patterns — the dots go into the PDF as the same 1200 dpi raster
+    that ``tttool oid-codes`` writes, which is known to work."""
+    pytest.importorskip("PIL")
+    import base64
+    import io
+
+    name, result = built
+    # The dots reach the page as a raster tile: 48 px of a 1200 dpi PNG tile
+    # exactly 1 mm, the same image tttool oid-codes writes.
+    svg = (client.data_dir / name / "druck" / "seite-1.svg").read_text()
+    match = re.search(r'base64,([A-Za-z0-9+/=]+)', svg)
+    assert match, "no raster dots in the page"
+    from PIL import Image
+
+    tile = Image.open(io.BytesIO(base64.b64decode(match.group(1))))
+    assert tile.size == (48, 48)
+    assert abs(tile.info["dpi"][0] - 1200) < 1
+
+    # 1 mm of lattice at 1200 dpi: dots every 12 px, none larger than 2 px.
+    dark = [(x, y) for y in range(48) for x in range(48) if tile.convert("L").getpixel((x, y)) < 128]
+    assert dark, "the tile carries no dots at all"
+    xs = sorted({x for x, _ in dark})
+    runs = []
+    start = prev = xs[0]
+    for x in xs[1:]:
+        if x > prev + 3:
+            runs.append((start, prev))
+            start = x
+        prev = x
+    runs.append((start, prev))
+    assert all(r[1] - r[0] <= 2 for r in runs), f"a dot is wider than 2 px: {runs}"
+    assert len(runs) >= 4, f"too few dot columns for a 1 mm tile: {runs}"
 
 
 def test_codes_stay_the_same_when_the_book_is_built_again(client, built):
